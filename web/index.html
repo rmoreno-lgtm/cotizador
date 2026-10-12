@@ -1,0 +1,18 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cotizador · QUILLUM</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head><body>
+<header><div class="brand">QUILLUM<small>SEGUROS Y FIANZAS</small></div><form action="/logout" method="post"><button class="secondary">Salir</button></form></header>
+<main><div class="intro"><span class="eyebrow">PERSONALIZA VARIABLE · GNP</span><h1>Tu próxima propuesta,<br>desde un solo lugar.</h1><p>Cotiza o transforma un PDF de GNP en tu propuesta personalizada.</p></div>
+<div id="aviso" role="status"></div>
+<details id="configuracion"><summary>Logo y configuración</summary><p id="config-text"></p><form id="logo-form"><label>Logo QUILLUM · PNG, máximo 2 MB<input type="file" id="logo" accept="image/png" required></label><button>Cargar logo</button></form></details>
+<div class="layout"><section class="panel"><h2>Nueva solicitud</h2><form id="cotizacion">
+<label>¿Qué deseas hacer?<select id="metodo"><option value="gnp">Cotizar en GNP</option><option value="pdf">Generar propuesta desde un PDF de GNP</option></select></label>
+<label id="pdf-label" hidden>PDF de GNP · máximo 40 MB<input id="pdf" type="file" accept="application/pdf"><small>Captura abajo los mismos datos que aparecen en ese PDF.</small></label>
+<label>Nombre del cliente<input name="nombre" maxlength="100" autocomplete="name" required></label>
+<h3>Titular</h3><div class="fields"><label>Edad<input name="edad" type="number" min="0" max="120" step="1" required></label><label>Género<select name="genero"><option>Masculino</option><option>Femenino</option></select></label><label>Código postal<input name="cp" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required></label></div>
+<label>Familiares adicionales<select id="cantidad"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label><div id="familiares"></div>
+<p class="benefit" id="solidez">Solidez Familiar: no aplica con menos de cuatro asegurados.</p>
+<h3>Condiciones</h3><div class="fields"><label>Tabulador médico<select name="tabulador" id="tabulador"></select></label><label>Deducible<select name="deducible" id="deducible"></select></label><label>Acceso hospitalario<select name="acceso" id="acceso"></select></label></div>
+<label>Alta Tecnología y Medicina de Vanguardia<select name="alta"><option value="false">No agregar</option><option value="true">Agregar</option></select></label>
+<p class="hint">La disponibilidad de las opciones y coberturas se valida con la cotización de GNP. Los PDF son propuestas informativas.</p>
+<button id="enviar">Revisar y enviar solicitud</button></form></section>
+<section class="panel"><h2>Mis solicitudes</h2><p>Las cotizaciones se procesan una a la vez. Los documentos estarán disponibles aquí al terminar.</p><div id="trabajos" aria-live="polite"></div><p class="hint">La conexión con WhatsApp se añadirá en la siguiente etapa.</p></section></div>
+</main><footer>QUILLUM · Uso interno del despacho</footer></body></html>
