@@ -120,7 +120,7 @@ ${footer(3)}</section></html>`;
 }
 
 async function generarPropuesta(datos, opciones = {}) {
-  if (!datos || datos.schemaVersion !== 1 || !datos.folio || !datos.tablaHtml) {
+  if (!datos || datos.schemaVersion !== 1 || !datos.folio || (!datos.tablaHtml && !(opciones.documento && Array.isArray(datos.opciones) && datos.opciones.every(d=>d.schemaVersion===1)))) {
     throw new Error('Faltan datos verificados. Usa el cotizador o integracion.cjs con el PDF de GNP y su solicitud.');
   }
   const baseDir = opciones.baseDir || __dirname;
@@ -138,7 +138,7 @@ async function generarPropuesta(datos, opciones = {}) {
   const carpeta = path.join(baseDir, 'propuestas');
   await fs.mkdir(carpeta, { recursive: true });
   const nombre = path.join(carpeta, opciones.nombreSalida || `QUILLUM-${datos.folio}-${Date.now()}`);
-  const html = documento(logo, qr, datos);
+  const html = (opciones.documento || documento)(logo, qr, datos);
   await fs.writeFile(nombre + '.html', html);
   const browser = await chromium.launch({ headless: true, ...(opciones.executablePath ? {executablePath: opciones.executablePath} : {}) });
   try {

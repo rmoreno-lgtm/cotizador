@@ -23,10 +23,31 @@ function familiares() {
   }
   $('solidez').textContent=n>=3?'Solidez Familiar: se solicitará automáticamente para '+(n+1)+' asegurados. El descuento se comprobará en GNP.':'Solidez Familiar: no aplica con menos de cuatro asegurados.';
 }
+let configComparativo;
+function opcionesComparativo() {
+  const prev=[...$('opciones-comparativo').children].map(e=>[...e.querySelectorAll('select')].map(s=>s.value));
+  $('opciones-comparativo').replaceChildren();
+  for(let i=0;i<Number($('cantidad-opciones').value);i++) {
+    const div=document.createElement('div');div.className='fields';
+    const h=document.createElement('h3');h.textContent='Opción '+(i+1);div.append(h);
+    for(const [titulo,valores,valor] of [['Deducible',configComparativo.deducibles,prev[i]?.[0]||['32000','56000','87000'][i]],['Tabulador',configComparativo.tabuladores,prev[i]?.[1]||$('tabulador').value]]) {
+      const l=document.createElement('label');l.textContent=titulo;const sel=document.createElement('select');
+      valores.forEach(v=>sel.add(new Option(titulo==='Deducible'?'$'+Number(v).toLocaleString('es-MX'):v,v)));sel.value=valor;l.append(sel);div.append(l);
+    }
+    $('opciones-comparativo').append(div);
+  }
+}
+$('modalidad').onchange=()=>{
+  const comparar=$('modalidad').value==='comparativo';$('comparativo').hidden=!comparar;
+  $('deducible').disabled=comparar;$('tabulador').disabled=comparar;
+  if(comparar){$('metodo').value='gnp';$('metodo').onchange();opcionesComparativo();}
+  $('metodo').disabled=comparar;
+};
+$('cantidad-opciones').onchange=opcionesComparativo;
 function datos() {
   const f=new FormData($('cotizacion'));
   return {nombre:f.get('nombre'),edad:f.get('edad'),genero:f.get('genero'),cp:f.get('cp'),
-    tabulador:f.get('tabulador'),deducible:f.get('deducible'),acceso:f.get('acceso'),alta:f.get('alta')==='true',
+    modalidad:$('modalidad').value,...($('modalidad').value==='comparativo'?{opciones:[...$('opciones-comparativo').children].map(e=>{const s=e.querySelectorAll('select');return {deducible:s[0].value,tabulador:s[1].value};})}:{}),tabulador:$('tabulador').value,deducible:$('deducible').value,acceso:f.get('acceso'),alta:f.get('alta')==='true',
     familiares:[...$('familiares').querySelectorAll('.familiar')].map(e=>({edad:e.querySelector('input').value,genero:e.querySelector('select').value}))};
 }
 let paginaHistorial=1, paginasHistorial=1, versionHistorial=0;
@@ -40,6 +61,7 @@ function detalleSolicitud(j,abierto) {
   detalle.append(parrafo('Origen: '+(j.tipo==='pdf'?'PDF de GNP cargado':'Cotización en GNP')));
   detalle.append(parrafo('Titular: '+s.edad+' años · '+s.genero+' · CP '+s.cp));
   (s.familiares||[]).forEach((f,i)=>detalle.append(parrafo('Familiar '+(i+1)+': '+f.edad+' años · '+f.genero)));
+  for(const [i,o] of (s.opciones||[]).entries())detalle.append(parrafo('Opción '+(i+1)+': deducible '+moneda(Number(o.deducible)*100)+' · tabulador '+o.tabulador));
   detalle.append(parrafo('Condiciones solicitadas: tabulador '+s.tabulador+' · deducible '+moneda(Number(s.deducible)*100)+' · acceso '+s.acceso));
   detalle.append(parrafo('Alta Tecnología: '+(s.alta?'solicitada':'no solicitada')+' · Solidez Familiar: '+(s.solidez?'solicitada':'no solicitada')));
   if(moneda(r.descuentoFamiliar)!==null)detalle.append(parrafo('Descuento familiar en GNP: '+moneda(r.descuentoFamiliar)+(r.descuentoIncluidoEnNeta?' (ya aplicado en la prima neta)':'')));
@@ -72,19 +94,21 @@ async function refrescar() {
       estado.textContent=({pendiente:'En cola',procesando:'Procesando',completada:'Completada',error:'Requiere revisión'})[j.estado];div.append(estado);
       const n=1+(j.solicitud?.familiares?.length||0);
       div.append(parrafo(n+' asegurado'+(n===1?'':'s')+' · '+fechaHistorial(j.creadaEn),'hint'));
+      if(j.solicitud?.modalidad==='comparativo')div.append(parrafo('Comparativo de '+j.solicitud.opciones.length+' opciones'));
+      for(const [i,o] of (j.resultado?.opciones||[]).entries())div.append(parrafo('Opción '+(i+1)+': deducible '+moneda(Number(o.deducible)*100)+' · tabulador '+o.tabulador+' · prima anual '+moneda(o.totalAnual)));
       if(j.resultado?.folio)div.append(parrafo('Folio GNP: '+j.resultado.folio));
       if(moneda(j.resultado?.totalAnual)!==null)div.append(parrafo('Prima anual: '+moneda(j.resultado.totalAnual),'prima-historial'));
       if(j.error)div.append(parrafo(j.error,'error'));
       for(const a of j.resultado?.advertencias||[])div.append(parrafo(a,'hint'));
       div.append(detalleSolicitud(j,abiertos.has(j.id)));
       const acciones=document.createElement('div');acciones.className='acciones';
-      if(j.estado==='completada')for(const [tipo,texto] of [['propuesta','Propuesta QUILLUM'],['gnp','Cotización GNP']]){
+      if(j.estado==='completada')for(const [tipo,texto] of [['propuesta',j.solicitud?.modalidad==='comparativo'?'Comparativo QUILLUM':'Propuesta QUILLUM'],...(j.solicitud?.modalidad==='comparativo'?j.solicitud.opciones.map((_,i)=>['gnp-'+(i+1),'GNP opción '+(i+1)]):[['gnp','Cotización GNP']])]){
         const a=document.createElement('a');a.href='/api/jobs/'+j.id+'/files/'+tipo;a.textContent=texto;acciones.append(a);
       }
       if(j.estado==='error'){
         const b=document.createElement('button');b.textContent='Reintentar';b.className='secondary';
         b.onclick=async()=>{if(!confirm('¿Reintentar esta solicitud? Si hubo un PDF previo, revísalo primero.'))return;b.disabled=true;try{await api('/api/jobs/'+j.id+'/retry',{method:'POST'});await refrescar();}catch(e){aviso(e.message);b.disabled=false;}};acciones.append(b);
-        const a=document.createElement('a');a.href='/api/jobs/'+j.id+'/files/gnp';a.textContent='Revisar PDF de GNP, si se generó';acciones.append(a);
+        for(const tipo of (j.solicitud?.modalidad==='comparativo'?j.solicitud.opciones.map((_,i)=>'gnp-'+(i+1)):['gnp'])){const a=document.createElement('a');a.href='/api/jobs/'+j.id+'/files/'+tipo;a.textContent='Revisar PDF '+tipo+', si se generó';acciones.append(a);}
       }
       if(['completada','error'].includes(j.estado)) {
         const borrar=document.createElement('button');borrar.className='danger';borrar.textContent='Eliminar';
@@ -115,7 +139,8 @@ $('metodo').onchange=()=>{$('pdf-label').hidden=$('metodo').value!=='pdf';$('pdf
 $('logo-form').onsubmit=async e=>{e.preventDefault();const f=new FormData();f.append('logo',$('logo').files[0]);try{await api('/api/logo',{method:'POST',body:f});aviso('Logo guardado. Ya puedes generar propuestas.');await cargarConfig();}catch(e){aviso(e.message);}};
 $('cotizacion').onsubmit=async e=>{
   e.preventDefault();const s=datos();
-  const resumen=`${s.nombre}\nTitular: ${s.edad} años, ${s.genero}, CP ${s.cp}\nFamiliares: ${s.familiares.map(f=>f.edad+' años, '+f.genero).join('; ')||'ninguno'}\nTabulador ${s.tabulador}, deducible $${Number(s.deducible).toLocaleString('es-MX')}, acceso ${s.acceso}\nAlta Tecnología: ${s.alta?'sí':'no'}\nSolidez Familiar: ${s.familiares.length>=3?'solicitar':'no aplicar'}\n\n¿Confirmas la solicitud?`;
+  const comparacion=s.opciones?'\nComparativo:\n'+s.opciones.map((o,i)=>`Opción ${i+1}: deducible $${Number(o.deducible).toLocaleString('es-MX')}, tabulador ${o.tabulador}`).join('\n'):'';
+  const resumen=`${s.nombre}${comparacion}\nTitular: ${s.edad} años, ${s.genero}, CP ${s.cp}\nFamiliares: ${s.familiares.map(f=>f.edad+' años, '+f.genero).join('; ')||'ninguno'}\n${s.opciones?'Acceso '+s.acceso:'Tabulador '+s.tabulador+', deducible $'+Number(s.deducible).toLocaleString('es-MX')+', acceso '+s.acceso}\nAlta Tecnología: ${s.alta?'sí':'no'}\nSolidez Familiar: ${s.familiares.length>=3?'solicitar':'no aplicar'}\n\n¿Confirmas la solicitud?`;
   if(!confirm(resumen))return;
   $('enviar').disabled=true;
   try{
@@ -126,5 +151,5 @@ $('cotizacion').onsubmit=async e=>{
     await api(endpoint,options);paginaHistorial=1;$('buscar').value='';$('estado').value='';aviso('Solicitud recibida. Puedes seguir su avance y descargar los documentos aquí.');await refrescar();
   }catch(e){aviso(e.message);}finally{$('enviar').disabled=false;}
 };
-async function cargarConfig(){const c=await api('/api/config');opciones('deducible',c.deducibles,'32000');opciones('tabulador',c.tabuladores,'D');opciones('acceso',c.accesos,'Amplio');$('config-text').textContent=(c.logo?'Logo cargado. ':'Falta cargar el logo. ')+(c.gnpConfigurado?'Credenciales de GNP configuradas; el acceso se comprobará al cotizar.':'Faltan las credenciales de GNP; puedes probar con un PDF existente.')+' '+c.nota;if(!c.logo)$('configuracion').open=true;}
+async function cargarConfig(){const c=await api('/api/config');configComparativo=c;opciones('deducible',c.deducibles,'32000');opciones('tabulador',c.tabuladores,'D');opciones('acceso',c.accesos,'Amplio');$('config-text').textContent=(c.logo?'Logo cargado. ':'Falta cargar el logo. ')+(c.gnpConfigurado?'Credenciales de GNP configuradas; el acceso se comprobará al cotizar.':'Faltan las credenciales de GNP; puedes probar con un PDF existente.')+' '+c.nota;if(!c.logo)$('configuracion').open=true;}
 (async()=>{try{await cargarConfig();familiares();await refrescar();setInterval(refrescar,5000);}catch(e){aviso(e.message);}})();
