@@ -76,7 +76,7 @@ ${datos.beneficiosHtml || ""}
 </div>
 <p class="small">Aplican condiciones, disponibilidad y alcance de cada servicio.</p>
 <div class="hero"><div><small>INVERSIÓN ANUAL TOTAL · MXN</small><strong>$${datos.total}</strong></div><p>Pago anual.<br>Incluye derecho de póliza e IVA.</p></div>
-<p class="small">Prima neta: $${datos.neta} · Derecho de póliza: $${datos.derecho} · IVA: $${datos.iva}.<br>Recargo por pago fraccionado: $${datos.recargo} · Descuento por Solidez Familiar: $${datos.descuento}.</p>
+<p class="small">Prima neta: $${datos.neta} · Derecho de póliza: $${datos.derecho} · IVA: $${datos.iva}.<br>Recargo por pago fraccionado: $${datos.recargo} · Descuento por Solidez Familiar${datos.descuentoIncluidoEnNeta ? ' (ya aplicado)' : ''}: $${datos.descuento}.</p>
 <div class="strip"><h3>El respaldo de QUILLUM, cuando más lo necesitas</h3><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p></div>
 <p class="small">Cotizada: ${datos.fecha} · Válida hasta: ${datos.vence}.<br>Asesor registrado en GNP: ${datos.agente}.</p>
 ${footer(1)}</section>

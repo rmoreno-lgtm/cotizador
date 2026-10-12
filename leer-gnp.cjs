@@ -72,7 +72,10 @@ function analizarPaginas(paginas, solicitud) {
     descuento: importe(p,'Descuento\\s+por solidez\\s+familiar','descuento familiar'),
     iva: importe(p,'I\\.?V\\.?A\\.?','IVA')
   };
-  if(monto.neta+monto.recargo+monto.derecho-monto.descuento+monto.iva!==monto.total) {
+  const totalConNeta=monto.neta+monto.recargo+monto.derecho+monto.iva;
+  // GNP puede presentar la prima neta ya descontada. No restar ese beneficio dos veces.
+  const descuentoIncluidoEnNeta=monto.descuento>0 && totalConNeta===monto.total;
+  if(totalConNeta!==monto.total && totalConNeta-monto.descuento!==monto.total) {
     throw new Error('Los importes de GNP no cuadran al centavo. No se generó la propuesta.');
   }
   const acceso = obligatorio(p,/Acceso hospitalario\s*\n\s*([^\n]+)/i,'acceso hospitalario');
@@ -89,6 +92,24 @@ function analizarPaginas(paginas, solicitud) {
     mismo(a.genero,esperados[i].genero,`género del asegurado ${i+1}`);
     mismo(a.cp,solicitud.cp,`CP del asegurado ${i+1}`);
   });
+  const inicioDesglose=textos.findIndex(t=>/Desglose de Cotización/i.test(t));
+  if(inicioDesglose<0) throw new Error('Falta el desglose por asegurado de GNP.');
+  const desglose=textos.slice(inicioDesglose).join('\n').replace(/[\t\u00a0]/g,' ');
+  const sumarDesglose=(etiqueta,campo)=>{
+    const re=new RegExp(etiqueta+'\\s*:\\s*\\$\\s*'+cantidad,'gi');
+    const valores=[...desglose.matchAll(re)].map(m=>centavos(m[1]));
+    if(valores.length!==asegurados.length) throw new Error(`No se pudo verificar ${campo} para todos los asegurados.`);
+    return valores.reduce((a,b)=>a+b,0);
+  };
+  const totalDesglose=sumarDesglose('Importe Total Anual','el total anual');
+  const netaDesglose=sumarDesglose('Prima Neta','la prima neta');
+  const recargoDesglose=sumarDesglose('Recargo por pago Fraccionado','el recargo');
+  const derechoDesglose=sumarDesglose('Derecho de Póliza','el derecho de póliza');
+  const ivaDesglose=sumarDesglose('I\\.?V\\.?A\\.?','el IVA');
+  const netaEsperada=descuentoIncluidoEnNeta || monto.descuento===0?monto.neta:monto.neta-monto.descuento;
+  if(totalDesglose!==monto.total || netaDesglose!==netaEsperada || recargoDesglose!==monto.recargo || derechoDesglose!==monto.derecho || ivaDesglose!==monto.iva) {
+    throw new Error('El resumen de GNP no coincide con la suma del desglose de todos los asegurados. No se generó la propuesta.');
+  }
   const tabla = participacion.replace(/[\t\u00a0]/g,' ');
   const regex = new RegExp('(?:^|\\n)\\s*([ABCD])\\s+\\$\\s*'+cantidad+'\\s*\\(I\\)\\s+(\\d+(?:\\.\\d+)?)%\\s+\\$\\s*'+cantidad,'g');
   const niveles = [...tabla.matchAll(regex)].map(m=>({nivel:m[1],deducible:centavos(m[2]),porcentaje:Number(m[3]),tope:centavos(m[4])}));
@@ -121,7 +142,7 @@ function analizarPaginas(paginas, solicitud) {
     fecha:fecha(obligatorio(p,/Fecha de cotización:\s*([^\s]+)/i,'fecha de cotización')),
     vence:fecha(obligatorio(p,/Válida hasta:\s*([^\s]+)/i,'vigencia')),
     agente:obligatorio(p,/Agente:\s*([^\n]+)/i,'asesor'),
-    acceso,tabulador,asegurados,niveles,monto,
+    acceso,tabulador,asegurados,niveles,monto,descuentoIncluidoEnNeta,
     suma:importe(tabla,'Suma Asegurada Cobertura Básica','suma asegurada'),
     coberturas,altaSolicitada:solicitud.alta,altaConfirmada,altaVerificadaEnPortal:solicitud.altaVerificadaEnPortal===true,asistencias,advertencias,
     solidezSolicitada:solicitud.solidez
