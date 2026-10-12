@@ -3,7 +3,7 @@ const fs=require('node:fs/promises'),os=require('node:os'),path=require('node:pa
 const {solicitud}=require('../solicitud.cjs');
 const {ejecutarComparativo,validarComparacion,documentoComparativo}=require('../comparativo.cjs');
 const base={nombre:'Cliente <prueba>',edad:'40',genero:'Masculino',cp:'64990',familiares:[],tabulador:'A',deducible:'32000',acceso:'Amplio',alta:false,modalidad:'comparativo',opciones:[{deducible:'32000',tabulador:'A'},{deducible:'56000',tabulador:'B'},{deducible:'87000',tabulador:'D'}]};
-const datos=s=>({schemaVersion:1,nombre:s.nombre,folio:'folio-'+s.deducible,plan:'Personaliza Variable',asegurados:[{edad:40,genero:s.genero,cp:s.cp}],acceso:s.acceso,suma:9328000000,altaSolicitada:s.alta,altaConfirmada:false,solidezSolicitada:false,tabulador:s.tabulador,vence:'26/Oct/2026',monto:{total:Number(s.deducible)*20},niveles:['A','B','C','D'].map((nivel,i)=>({nivel,deducible:Number(s.deducible)*100-i*100000,porcentaje:20-i*5,tope:9400000-i*1000000})),advertencias:[],coberturas:[],asistencias:{}});
+const datos=s=>({schemaVersion:1,nombre:s.nombre,folio:'folio-'+s.deducible,plan:'Personaliza Variable',asegurados:[{edad:40,genero:s.genero,cp:s.cp}],acceso:s.acceso,suma:9328000000,altaSolicitada:s.alta,altaConfirmada:false,solidezSolicitada:false,tabulador:s.tabulador,vence:'26/Oct/2026',monto:{total:Number(s.deducible)*20,neta:500000,derecho:10000,iva:80000,recargo:0,descuento:0},niveles:['A','B','C','D'].map((nivel,i)=>({nivel,deducible:Number(s.deducible)*100-i*100000,porcentaje:20-i*5,tope:9400000-i*1000000})),advertencias:[],coberturas:[],asistencias:{}});
 test('valida opciones distintas y conserva perfil único',()=>{
  const s=solicitud(base);assert.equal(s.opciones.length,3);assert.equal(s.tabulador,'A');
  assert.throws(()=>solicitud({...base,opciones:[base.opciones[0],base.opciones[0]]}),/distintas/);
@@ -50,4 +50,13 @@ test('reintento conserva PDF verificados y cotiza solo la opción pendiente en u
   llamadas=[];await fs.writeFile(path.join(dir,'opcion-2','gnp.pdf'),'%PDF-corrupto');await ejecutarComparativo(j,dir,deps);assert.deepEqual(llamadas,['56000']);
   llamadas=[];const antiguo=new Date(Date.now()-7200000);await fs.utimes(path.join(dir,'opcion-1','gnp.pdf'),antiguo,antiguo);await ejecutarComparativo(j,dir,deps);assert.deepEqual(llamadas,['32000']);
  }finally{await fs.rm(dir,{recursive:true,force:true});}
+});
+test('presentación distingue deducible y tabulador; beneficios preceden precio y no inventa cambio de participación',()=>{
+ const primero={...datos(base),asistencias:{dental:true,psicologica:true,movil:true},coberturas:['Cero deducible por accidente cubierto']};
+ const segundo={...primero,tabulador:'B',monto:{...primero.monto,total:primero.monto.total-10000}};
+ const tercero={...primero,niveles:primero.niveles.map(n=>({...n,deducible:n.deducible+100000})),tabulador:'D'};
+ const {cambiosOpcion}=require('../comparativo.cjs');assert.deepEqual(cambiosOpcion(primero,segundo),['tabulador médico']);assert.deepEqual(cambiosOpcion(primero,tercero),['deducible','tabulador médico']);
+ const contenido=documentoComparativo('logo','qr',{opciones:[primero,segundo,tercero]});
+ assert.ok(contenido.indexOf('<h3>Médica Móvil')<contenido.indexOf('OPCIÓN 1'));assert.ok(contenido.includes('En accidente cubierto no pagas deducible.'));assert.ok(contenido.includes('$100.00 menos al año'));assert.ok(contenido.includes('Misma participación'));assert.ok(contenido.includes('Tu participación total'));
+ const sinAlta=documentoComparativo('logo','qr',{opciones:[primero,segundo]});assert.ok(!sinAlta.includes('<h3>Alta Tecnología'));
 });
