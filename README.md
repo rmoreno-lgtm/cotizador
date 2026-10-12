@@ -29,7 +29,9 @@ El QR de las propuestas solamente abre una conversación de WhatsApp.
 
    | Variable | Uso |
    | --- | --- |
-   | `APP_SECRET` | Clave privada de al menos 32 caracteres para entrar a la aplicación. |
+   | `APP_SECRET` | Llave interna/API de al menos 32 caracteres; firma las sesiones. |
+   | `APP_USERNAME` | Usuario del formulario; por defecto `quillum`. |
+   | `APP_PASSWORD` | Contraseña propia del formulario, de al menos 12 caracteres. |
    | `GNP_USERNAME` | Usuario de GNP. |
    | `GNP_PASSWORD` | Contraseña de GNP. |
    | `DATA_DIR` | `/data`. |
@@ -37,6 +39,13 @@ El QR de las propuestas solamente abre una conversación de WhatsApp.
    `PORT` lo proporciona Railway. `NODE_ENV=production` está configurado en Docker.
    Generar una clave local con `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
    y pegarla directamente en Variables, no en GitHub ni en el chat.
+
+   `APP_SECRET` sigue siendo la llave interna/API y firma las sesiones. Al definir
+   `APP_PASSWORD`, el formulario solicita esa contraseña. Si todavía no está
+   definida, acepta la clave anterior para facilitar la transición. El navegador
+   ofrece guardar usuario y contraseña mediante su gestor. “Recordarme durante
+   30 días” conserva la sesión en ese dispositivo; sin esa opción dura un día.
+   Cambiar usuario, contraseña o APP_SECRET invalida las sesiones existentes.
 
 5. Mantener **una sola réplica**: la cola usa el volumen local, no una base de datos
    distribuida. No activar suspensión mientras haya solicitudes pendientes.
