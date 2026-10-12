@@ -10,7 +10,7 @@ const png=b=>b && b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])
 const iguales=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length && crypto.timingSafeEqual(x,y);};
 function limpiarError(error,env) {
   let mensaje=String(error?.message || 'No se pudo completar la solicitud.');
-  for(const valor of [env.GNP_USERNAME,env.GNP_PASSWORD,env.APP_SECRET]) if(valor) mensaje=mensaje.split(valor).join('[oculto]');
+  for(const valor of [env.GNP_USERNAME,env.GNP_PASSWORD,env.APP_SECRET,env.APP_PASSWORD]) if(valor) mensaje=mensaje.split(valor).join('[oculto]');
   return mensaje.slice(0,1800);
 }
 async function crearApp({env=process.env,ejecutor}={}) {
@@ -19,6 +19,10 @@ async function crearApp({env=process.env,ejecutor}={}) {
   await fs.mkdir(base,{recursive:true});
   const secreto=String(env.APP_SECRET||'');
   const secretValido=secreto.length>=32;
+  const usuario=String(env.APP_USERNAME||'quillum').trim();
+  const password=env.APP_PASSWORD===undefined || env.APP_PASSWORD===''?secreto:String(env.APP_PASSWORD);
+  const loginValido=secretValido && /^[\p{L}\p{N}._@-]{1,80}$/u.test(usuario) && password.length>=12;
+  const sesionVersion=crypto.createHmac('sha256',secreto).update(usuario+'\0'+password).digest('base64url');
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:40*1024*1024,files:1,fields:2,fieldSize:20000}});
   const uploadLogo=multer({storage:multer.memoryStorage(),limits:{fileSize:2*1024*1024,files:1,fields:0}});
   const logoPath=path.join(base,'logo-quillum.png');
@@ -45,7 +49,7 @@ async function crearApp({env=process.env,ejecutor}={}) {
     if(!cookie)return false;
     const [p,sign,...extra]=cookie.slice(8).split('.');
     if(!p || !sign || extra.length || !iguales(sign,firma(p)))return false;
-    try{const data=JSON.parse(Buffer.from(p,'base64url').toString());return typeof data.exp==='number' && Date.now()<data.exp;}catch{return false;}
+    try{const data=JSON.parse(Buffer.from(p,'base64url').toString());return loginValido && data.v===sesionVersion && typeof data.exp==='number' && Date.now()<data.exp;}catch{return false;}
   };
   const auth=req=>cookieValida(req) || (secretValido && iguales(req.get('Authorization')||'','Bearer '+secreto));
   app.use((req,res,next)=>{
@@ -58,22 +62,25 @@ async function crearApp({env=process.env,ejecutor}={}) {
   });
   app.use(express.json({limit:'20kb'}));
   app.use(express.urlencoded({extended:false,limit:'20kb'}));
-  app.get('/healthz',(req,res)=>res.json({ok:true,configurada:secretValido,version}));
+  app.get('/healthz',(req,res)=>res.json({ok:true,configurada:loginValido,version}));
   app.get('/style.css',(req,res)=>res.sendFile(path.join(__dirname,'web/style.css')));
-  app.get('/login',(req,res)=>res.sendFile(path.join(__dirname,'web/login.html')));
+  app.get('/login',(req,res)=>auth(req)?res.redirect('/'):res.sendFile(path.join(__dirname,'web/login.html')));
   const intentos=new Map();
   app.post('/login',(req,res)=>{
     if(!secretValido)return res.status(503).send('Configura APP_SECRET con al menos 32 caracteres en Variables de Railway.');
+    if(!loginValido)return res.status(503).send('Configura APP_PASSWORD con al menos 12 caracteres y un APP_USERNAME válido en Railway.');
     const ip=req.ip || 'sin-ip';const ahora=Date.now();const t=intentos.get(ip);
     if(t && t.hasta>ahora && t.cantidad>=10)return res.status(429).send('Demasiados intentos. Espera 15 minutos.');
-    if(!iguales(req.body?.clave||'',secreto)){
+    const recibido=String(req.body?.usuario||(env.APP_PASSWORD?'':usuario));
+    if(!iguales(recibido,usuario) || !iguales(req.body?.clave||'',password)){
       if(!t || t.hasta<=ahora)intentos.set(ip,{cantidad:1,hasta:ahora+900000});else t.cantidad++;
-      return res.status(401).send('Clave incorrecta. Vuelve a /login e intenta nuevamente.');
+      return res.status(401).send('Usuario o contraseña incorrectos. Vuelve a /login e intenta nuevamente.');
     }
     intentos.delete(ip);
     for(const [key,v] of intentos)if(v.hasta<ahora)intentos.delete(key);
-    const token=Buffer.from(JSON.stringify({exp:Date.now()+86400000,nonce:crypto.randomBytes(12).toString('hex')})).toString('base64url');
-    res.cookie('quillum',token+'.'+firma(token),{httpOnly:true,secure:env.NODE_ENV==='production',sameSite:'strict',maxAge:86400000,path:'/'});
+    const duracion=req.body?.recordar==='si'?30*86400000:86400000;
+    const token=Buffer.from(JSON.stringify({exp:Date.now()+duracion,v:sesionVersion,nonce:crypto.randomBytes(12).toString('hex')})).toString('base64url');
+    res.cookie('quillum',token+'.'+firma(token),{httpOnly:true,secure:env.NODE_ENV==='production',sameSite:'lax',maxAge:duracion,path:'/'});
     res.redirect('/');
   });
   app.use((req,res,next)=>auth(req)?next():req.path.startsWith('/api/')?res.status(401).json({error:'Inicia sesión.'}):res.redirect('/login'));
