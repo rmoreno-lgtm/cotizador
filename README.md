@@ -128,3 +128,11 @@ El historial permite abrir el detalle y eliminar solicitudes terminadas con sus 
 elimine; requiere administrar almacenamiento y respaldos según su operación.
 
 Los deducibles del formulario son los diez valores de la captura de GNP compartida: $21,000, $32,000, $45,000, $56,000, $68,000, $87,000, $111,000, $128,000, $175,000 y $233,000. Su disponibilidad final depende del portal al cotizar.
+
+### Comparativo QUILLUM
+
+En el formulario elige «Comparar deducibles y tabuladores» y selecciona dos o tres configuraciones distintas. Los asegurados, acceso hospitalario y Alta Tecnología son comunes a todas las opciones. Se ejecutan cotizaciones independientes y secuenciales mediante el recorrido existente de GNP; no se usa un botón «Editar» no verificado. Cada original se conserva en `opcion-N/gnp.pdf` y se valida contra su solicitud antes de generar un único comparativo de tres páginas.
+
+El comparativo muestra prima anual, deducible, tabulador, acceso, suma asegurada y ejemplos de participación para el mismo gasto en niveles hospitalarios A y B. Los honorarios fuera del tabulador no se calculan como si fueran coaseguro. Si una opción falla o cambian las coberturas comunes, el trabajo requiere revisión y no se publica un comparativo incompleto. El reintento vuelve a cotizar todas las opciones. Desde el historial se descargan por separado el comparativo y cada original. La carga de un solo PDF mantiene exclusivamente la modalidad individual.
+
+Validación local: `npm test`. La comprobación con el portal real requiere las credenciales de GNP configuradas en Railway.

@@ -30,6 +30,7 @@ async function crearApp({env=process.env,ejecutor}={}) {
   try{const release=JSON.parse(await fs.readFile(path.join(__dirname,'release.json'),'utf8'));if(/^[a-f0-9]{40}$/.test(release.commit||''))version=release.commit;}catch{}
   const puedeLogo=async()=>{try{return png(await fs.readFile(logoPath));}catch{return false;}};
   const ejecutar=ejecutor || (async(job,dir)=>{
+    if(job.solicitud.modalidad==='comparativo') return require('./comparativo.cjs').ejecutarComparativo(job,dir,{env,logoPath});
     let s=job.solicitud;
     const pdf=path.join(dir,'gnp.pdf');
     if(job.tipo==='gnp') s=await require('./cotizador-gnp.cjs').cotizar(s,pdf,env);
@@ -134,6 +135,7 @@ async function crearApp({env=process.env,ejecutor}={}) {
     if(tipo==='gnp' && (!env.GNP_USERNAME || !env.GNP_PASSWORD))return res.status(409).json({error:'Faltan las credenciales de GNP en Variables de Railway.'});
     let s;
     try{s=solicitud(tipo==='pdf'?JSON.parse(req.body.solicitud):req.body);}catch(e){return res.status(400).json({error:limpiarError(e,env)});}
+    if(tipo==='pdf' && s.modalidad==='comparativo')return res.status(400).json({error:'El comparativo requiere cotizar en GNP; un solo PDF no contiene las otras opciones.'});
     const key=req.get('Idempotency-Key');
     if(key && !/^[A-Za-z0-9_-]{1,100}$/.test(key))return res.status(400).json({error:'Identificador de solicitud inválido.'});
     try{const j=await cola.crear(s,tipo,pdf,key);res.status(202).json(await resumen(j));}catch(e){res.status(409).json({error:limpiarError(e,env)});}
@@ -157,14 +159,15 @@ async function crearApp({env=process.env,ejecutor}={}) {
   });
   app.get('/api/jobs/:id/files/:tipo',async(req,res)=>{
     const {id,tipo}=req.params;const j=cola.jobs.get(id);
-    if(!idValido(id) || !j || !['gnp','propuesta'].includes(tipo))return res.status(404).json({error:'Archivo no encontrado.'});
+    if(!idValido(id) || !j || !['gnp','gnp-1','gnp-2','gnp-3','propuesta'].includes(tipo))return res.status(404).json({error:'Archivo no encontrado.'});
     const dir=cola.carpeta(id);
-    const relativo=tipo==='gnp'?'gnp.pdf':j.estado==='completada'?j.resultado?.propuesta:null;
+    const numero=/^gnp-([123])$/.exec(tipo);
+    const relativo=numero && j.solicitud.modalidad==='comparativo' && Number(numero[1])<=j.solicitud.opciones.length?'opcion-'+numero[1]+'/gnp.pdf':tipo==='gnp' && j.solicitud.modalidad!=='comparativo'?'gnp.pdf':tipo==='propuesta' && j.estado==='completada'?j.resultado?.propuesta:null;
     if(!relativo)return res.status(404).json({error:'El documento aún no está disponible.'});
     const archivo=path.resolve(dir,relativo);
     if(!archivo.startsWith(dir+path.sep))return res.status(404).json({error:'Archivo no encontrado.'});
     try{await fs.access(archivo);}catch{return res.status(404).json({error:'Archivo no encontrado.'});}
-    res.download(archivo,tipo==='gnp'?'Cotizacion-GNP.pdf':`Propuesta-QUILLUM-${j.resultado.folio}.pdf`);
+    res.download(archivo,tipo.startsWith('gnp')?'Cotizacion-GNP-'+(numero?.[1]||'individual')+'.pdf':j.solicitud.modalidad==='comparativo'?'Comparativo-QUILLUM.pdf':`Propuesta-QUILLUM-${j.resultado.folio}.pdf`);
   });
   app.use((error,req,res,next)=>{
     if(res.headersSent)return next(error);
