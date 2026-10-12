@@ -22,6 +22,8 @@ async function crearApp({env=process.env,ejecutor}={}) {
   const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:40*1024*1024,files:1,fields:2,fieldSize:20000}});
   const uploadLogo=multer({storage:multer.memoryStorage(),limits:{fileSize:2*1024*1024,files:1,fields:0}});
   const logoPath=path.join(base,'logo-quillum.png');
+  let version=env.RAILWAY_GIT_COMMIT_SHA || '';
+  try{const release=JSON.parse(await fs.readFile(path.join(__dirname,'release.json'),'utf8'));if(/^[a-f0-9]{40}$/.test(release.commit||''))version=release.commit;}catch{}
   const puedeLogo=async()=>{try{return png(await fs.readFile(logoPath));}catch{return false;}};
   const ejecutar=ejecutor || (async(job,dir)=>{
     let s=job.solicitud;
@@ -31,7 +33,7 @@ async function crearApp({env=process.env,ejecutor}={}) {
     const resultado=await require('./integracion.cjs').generarDesdePdf(pdf,s,{
       baseDir:dir,logoPath,abrir:false,executablePath:env.CHROMIUM_EXECUTABLE_PATH
     });
-    return {propuesta:path.relative(dir,resultado.archivo),folio:resultado.datos.folio,advertencias:resultado.datos.advertencias};
+    return {propuesta:path.relative(dir,resultado.archivo),folio:resultado.datos.folio,advertencias:resultado.datos.advertencias,totalAnual:resultado.datos.monto.total,descuentoFamiliar:resultado.datos.monto.descuento,descuentoIncluidoEnNeta:resultado.datos.descuentoIncluidoEnNeta,niveles:resultado.datos.niveles};
   });
   const cola=new Cola(base,async(j,d)=>{
     try{return await ejecutar(j,d);}catch(e){throw new Error(limpiarError(e,env));}
@@ -56,7 +58,7 @@ async function crearApp({env=process.env,ejecutor}={}) {
   });
   app.use(express.json({limit:'20kb'}));
   app.use(express.urlencoded({extended:false,limit:'20kb'}));
-  app.get('/healthz',(req,res)=>res.json({ok:true,configurada:secretValido}));
+  app.get('/healthz',(req,res)=>res.json({ok:true,configurada:secretValido,version}));
   app.get('/style.css',(req,res)=>res.sendFile(path.join(__dirname,'web/style.css')));
   app.get('/login',(req,res)=>res.sendFile(path.join(__dirname,'web/login.html')));
   const intentos=new Map();
@@ -80,17 +82,45 @@ async function crearApp({env=process.env,ejecutor}={}) {
   app.get('/app.js',(req,res)=>res.sendFile(path.join(__dirname,'web/app.js')));
   app.get('/api/config',async(req,res)=>res.json({
     logo:await puedeLogo(),gnpConfigurado:Boolean(env.GNP_USERNAME && env.GNP_PASSWORD),
-    deducibles:['21000','32000','56000'],tabuladores:['A','B','C','D'],accesos:['Esencial','Amplio'],
+    deducibles:['21000','32000','45000','56000','68000','87000','111000','128000','175000','233000'],tabuladores:['A','B','C','D'],accesos:['Esencial','Amplio'],
     nota:'Las opciones disponibles se validan en GNP al cotizar. WhatsApp todavía no está conectado.'
   }));
   app.post('/api/logo',uploadLogo.single('logo'),async(req,res)=>{
     if(!png(req.file?.buffer))return res.status(400).json({error:'Adjunta tu logo como PNG real, de hasta 2 MB.'});
     const temp=logoPath+'.'+crypto.randomUUID();await fs.writeFile(temp,req.file.buffer);await fs.rename(temp,logoPath);res.json({ok:true});
   });
-  const resumen=j=>({id:j.id,estado:j.estado,nombre:j.solicitud.nombre,tipo:j.tipo,creadaEn:j.creadaEn,error:j.error,resultado:j.resultado});
-  app.get('/api/jobs',(req,res)=>res.json([...cola.jobs.values()].sort((a,b)=>b.creadaEn.localeCompare(a.creadaEn)).slice(0,30).map(resumen)));
-  app.get('/api/jobs/:id',(req,res)=>{
-    const j=cola.jobs.get(req.params.id);if(!j)return res.status(404).json({error:'Solicitud no encontrada.'});res.json(resumen(j));
+  const historial=new Map();
+  async function resumen(j) {
+    let resultado=j.resultado?{...j.resultado}:undefined;
+    // Leer los datos verificados de propuestas anteriores, sin regenerarlas ni modificarlas.
+    if(j.estado==='completada' && resultado?.propuesta && resultado.totalAnual===undefined) {
+      const clave=j.id+':'+resultado.propuesta;
+      let datos=historial.get(clave);
+      if(!datos) {
+        const dir=cola.carpeta(j.id);
+        const archivo=path.resolve(dir,resultado.propuesta.replace(/\.pdf$/i,'.verificado.json'));
+        if(archivo.startsWith(dir+path.sep)) {
+          try{const d=JSON.parse(await fs.readFile(archivo,'utf8'));if(d.folio===resultado.folio && Number.isSafeInteger(d.monto?.total) && d.monto.total>=0){datos=d;historial.set(clave,d);}}catch{}
+        }
+      }
+      if(datos) resultado={...resultado,totalAnual:datos.monto.total,descuentoFamiliar:datos.monto.descuento,descuentoIncluidoEnNeta:datos.descuentoIncluidoEnNeta,niveles:datos.niveles};
+    }
+    return {id:j.id,estado:j.estado,nombre:j.solicitud.nombre,tipo:j.tipo,creadaEn:j.creadaEn,iniciadaEn:j.iniciadaEn,terminadaEn:j.terminadaEn,error:j.error,solicitud:j.solicitud,resultado};
+  }
+  app.get('/api/jobs',async(req,res)=>{
+    const q=String(req.query.q||'').trim().toLocaleLowerCase('es-MX').slice(0,120);
+    const estado=String(req.query.estado||'');
+    if(estado && !['pendiente','procesando','completada','error'].includes(estado))return res.status(400).json({error:'Estado inválido.'});
+    const completo=[...cola.jobs.values()].sort((a,b)=>b.creadaEn.localeCompare(a.creadaEn)||b.id.localeCompare(a.id));
+    const filtrado=completo.filter(j=>(!estado || j.estado===estado) && (!q || [j.solicitud.nombre,j.resultado?.folio,j.solicitud.cp].some(v=>String(v||'').toLocaleLowerCase('es-MX').includes(q))));
+    // Mantener el formato anterior para clientes que no soliciten paginación.
+    if(req.query.page===undefined)return res.json(await Promise.all(filtrado.slice(0,30).map(resumen)));
+    const page=Number(req.query.page), limite=10;
+    if(!Number.isSafeInteger(page) || page<1 || page>1000000)return res.status(400).json({error:'Página inválida.'});
+    res.json({items:await Promise.all(filtrado.slice((page-1)*limite,page*limite).map(resumen)),total:filtrado.length,page,pages:Math.max(1,Math.ceil(filtrado.length/limite))});
+  });
+  app.get('/api/jobs/:id',async(req,res)=>{
+    const j=cola.jobs.get(req.params.id);if(!j)return res.status(404).json({error:'Solicitud no encontrada.'});res.json(await resumen(j));
   });
   async function crear(req,res,tipo,pdf) {
     if(!await puedeLogo())return res.status(409).json({error:'Carga primero el logo de QUILLUM.'});
@@ -99,7 +129,7 @@ async function crearApp({env=process.env,ejecutor}={}) {
     try{s=solicitud(tipo==='pdf'?JSON.parse(req.body.solicitud):req.body);}catch(e){return res.status(400).json({error:limpiarError(e,env)});}
     const key=req.get('Idempotency-Key');
     if(key && !/^[A-Za-z0-9_-]{1,100}$/.test(key))return res.status(400).json({error:'Identificador de solicitud inválido.'});
-    try{const j=await cola.crear(s,tipo,pdf,key);res.status(202).json(resumen(j));}catch(e){res.status(409).json({error:limpiarError(e,env)});}
+    try{const j=await cola.crear(s,tipo,pdf,key);res.status(202).json(await resumen(j));}catch(e){res.status(409).json({error:limpiarError(e,env)});}
   }
   app.post('/api/jobs',(req,res)=>crear(req,res,'gnp'));
   app.post('/api/pdf',upload.single('pdf'),(req,res)=>{
@@ -107,7 +137,16 @@ async function crearApp({env=process.env,ejecutor}={}) {
     return crear(req,res,'pdf',req.file.buffer);
   });
   app.post('/api/jobs/:id/retry',async(req,res)=>{
-    try{res.status(202).json(resumen(await cola.reintentar(req.params.id)));}catch(e){res.status(409).json({error:limpiarError(e,env)});}
+    try{res.status(202).json(await resumen(await cola.reintentar(req.params.id)));}catch(e){res.status(409).json({error:limpiarError(e,env)});}
+  });
+  app.delete('/api/jobs/:id',async(req,res)=>{
+    if(req.body?.confirmar!==true)return res.status(400).json({error:'Confirma la eliminación de la solicitud y de sus archivos.'});
+    if(!cola.jobs.has(req.params.id))return res.status(404).json({error:'Solicitud no encontrada.'});
+    try{
+      const resultado=await cola.eliminar(req.params.id);
+      for(const key of historial.keys())if(key.startsWith(req.params.id+':'))historial.delete(key);
+      res.json(resultado);
+    }catch(e){res.status(409).json({error:limpiarError(e,env)});}
   });
   app.get('/api/jobs/:id/files/:tipo',async(req,res)=>{
     const {id,tipo}=req.params;const j=cola.jobs.get(id);

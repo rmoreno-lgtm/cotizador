@@ -12,6 +12,10 @@ class Cola {
   async iniciar() {
     const root=path.join(this.base,'trabajos');await fs.mkdir(root,{recursive:true});
     for(const id of await fs.readdir(root)) {
+      const prefijo='.eliminando-';
+      if(id.startsWith(prefijo) && idValido(id.slice(prefijo.length))) {
+        await fs.rm(path.join(root,id),{recursive:true,force:true});continue;
+      }
       if(!idValido(id)) continue;
       let j;
       try { j=JSON.parse(await fs.readFile(path.join(root,id,'estado.json'),'utf8')); }
@@ -61,6 +65,21 @@ class Cola {
   async reintentarInterno(id) {
     const anterior=this.jobs.get(id);if(!anterior || anterior.estado!=='error') throw new Error('Solo se puede reintentar un trabajo con error.');
     const j={...anterior,estado:'pendiente'};delete j.error;await this.guardar(j);this.jobs.set(id,j);this.procesar();return j;
+  }
+  eliminar(id) {
+    const tarea=this.escritura.then(()=>this.eliminarInterno(id));
+    this.escritura=tarea.catch(()=>{});return tarea;
+  }
+  async eliminarInterno(id) {
+    const job=this.jobs.get(id);
+    if(!job || !idValido(id)) throw new Error('Solicitud no encontrada.');
+    if(!['completada','error'].includes(job.estado)) throw new Error('Espera a que termine la solicitud antes de eliminarla.');
+    // Retirar la carpeta del historial de forma atómica antes de borrar los PDF.
+    const dir=this.carpeta(id), temporal=path.join(this.base,'trabajos','.eliminando-'+id);
+    try{await fs.rename(dir,temporal);}catch(e){if(e.code!=='ENOENT')throw e;}
+    this.jobs.delete(id);
+    await fs.rm(temporal,{recursive:true,force:true});
+    return {id,eliminada:true};
   }
 }
 module.exports={Cola,idValido};

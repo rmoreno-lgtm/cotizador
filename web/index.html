@@ -10,9 +10,13 @@
 <h3>Titular</h3><div class="fields"><label>Edad<input name="edad" type="number" min="0" max="120" step="1" required></label><label>Género<select name="genero"><option>Masculino</option><option>Femenino</option></select></label><label>Código postal<input name="cp" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required></label></div>
 <label>Familiares adicionales<select id="cantidad"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label><div id="familiares"></div>
 <p class="benefit" id="solidez">Solidez Familiar: no aplica con menos de cuatro asegurados.</p>
-<h3>Condiciones</h3><div class="fields"><label>Tabulador médico<select name="tabulador" id="tabulador"></select></label><label>Deducible<select name="deducible" id="deducible"></select></label><label>Acceso hospitalario<select name="acceso" id="acceso"></select></label></div>
+<h3>Condiciones</h3><div class="fields"><label>Tabulador médico<select name="tabulador" id="tabulador"></select></label><label>Deducible base<select name="deducible" id="deducible"></select></label><label>Acceso hospitalario<select name="acceso" id="acceso"></select></label></div>
 <label>Alta Tecnología y Medicina de Vanguardia<select name="alta"><option value="false">No agregar</option><option value="true">Agregar</option></select></label>
 <p class="hint">La disponibilidad de las opciones y coberturas se valida con la cotización de GNP. Los PDF son propuestas informativas.</p>
 <button id="enviar">Revisar y enviar solicitud</button></form></section>
-<section class="panel"><h2>Mis solicitudes</h2><p>Las cotizaciones se procesan una a la vez. Los documentos estarán disponibles aquí al terminar.</p><div id="trabajos" aria-live="polite"></div><p class="hint">La conexión con WhatsApp se añadirá en la siguiente etapa.</p></section></div>
+<section class="panel"><h2>Mis solicitudes</h2><p>Revisa los datos, descarga los documentos o elimina solicitudes terminadas.</p>
+<div class="historial-filtros"><label>Buscar cliente, folio o CP<input type="search" id="buscar" placeholder="Nombre, folio o código postal"></label><label>Estado<select id="estado"><option value="">Todos</option><option value="pendiente">En cola</option><option value="procesando">Procesando</option><option value="completada">Completada</option><option value="error">Requiere revisión</option></select></label></div>
+<p id="historial-total" class="hint"></p><div id="trabajos" aria-live="polite"></div>
+<nav class="paginacion" aria-label="Páginas del historial"><button type="button" id="anterior" class="secondary">Anterior</button><span id="pagina"></span><button type="button" id="siguiente" class="secondary">Siguiente</button></nav>
+<p class="hint">Las solicitudes en cola o procesándose no se pueden eliminar. La conexión con WhatsApp se añadirá en la siguiente etapa.</p></section></div>
 </main><footer>QUILLUM · Uso interno del despacho</footer></body></html>

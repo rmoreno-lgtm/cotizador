@@ -1,0 +1,69 @@
+name: Validar y desplegar QUILLUM
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quillum-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Instalar dependencias verificadas por el lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Ejecutar las pruebas
+        run: npm test
+
+  desplegar:
+    needs: pruebas
+    if: github.ref == 'refs/heads/main' && vars.RAILWAY_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Comprobar la configuración de despliegue
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+          PUBLIC_URL: ${{ vars.RAILWAY_PUBLIC_URL }}
+        run: |
+          node -e 'for (const k of ["RAILWAY_TOKEN","PROJECT_ID","SERVICE_ID","ENVIRONMENT_ID","PUBLIC_URL"]) if (!process.env[k]) throw new Error("Falta configurar " + k + " en Settings > Secrets and variables > Actions"); const u=new URL(process.env.PUBLIC_URL); if(u.protocol!=="https:" || u.username || u.password) throw new Error("RAILWAY_PUBLIC_URL debe ser una dirección HTTPS sin credenciales");'
+      - name: Instalar la CLI oficial de Railway
+        run: npm install --global @railway/cli@5.64.2 --no-audit --no-fund
+      - name: Identificar la versión a desplegar
+        run: node -e 'require("fs").writeFileSync("release.json", JSON.stringify({commit:process.env.GITHUB_SHA}));'
+      - name: Construir y desplegar en Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+        run: railway up --project "$PROJECT_ID" --environment "$ENVIRONMENT_ID" --service "$SERVICE_ID" --ci
+      - name: Verificar que responde la nueva versión
+        env:
+          PUBLIC_URL: ${{ vars.RAILWAY_PUBLIC_URL }}
+        run: node scripts/verificar-despliegue.cjs

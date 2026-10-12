@@ -3,7 +3,7 @@ Cotizador GNP y generador de propuestas personalizadas.
 
 ## Esta versión
 
-Aplicación privada con formulario, una cola persistente y generación de la propuesta
+Aplicación privada con formulario, historial con búsqueda y filtros, una cola persistente y generación de la propuesta
 QUILLUM desde cada PDF de GNP. Mantiene la plantilla aprobada, la comparación de
 niveles A/B y el ejemplo del tope. Alta Tecnología se incluye cuando se selecciona.
 Cero deducible por accidente se destaca cuando aparece en el documento de GNP.
@@ -83,7 +83,9 @@ No entregar esta clave al frontend de un sitio externo: usar un backend/Worker.
 
 - `POST /api/jobs`: recibe la solicitud JSON y devuelve un trabajo en cola.
 - `POST /api/pdf`: multipart con `pdf` y `solicitud` (JSON de los mismos campos).
-- `GET /api/jobs/:id`: devuelve el estado y advertencias.
+- `GET /api/jobs?page=1&q=cliente&estado=completada`: historial paginado (10 por página), búsqueda por cliente/folio/CP y filtro de estado. Sin `page`, conserva el arreglo de hasta 30 registros para clientes anteriores.
+- `GET /api/jobs/:id`: devuelve el estado, datos de la solicitud e importes verificados cuando existen.
+- `DELETE /api/jobs/:id`: elimina una solicitud terminada y todos sus archivos con cuerpo `{"confirmar":true}`. Requiere autenticación y confirmación explícita. No elimina trabajos pendientes ni procesándose.
 - `GET /api/jobs/:id/files/gnp`: PDF original, si ya se descargó.
 - `GET /api/jobs/:id/files/propuesta`: propuesta terminada.
 - `POST /api/jobs/:id/retry`: reintento explícito de un trabajo con error.
@@ -113,5 +115,7 @@ como en la versión local. Los PDF se contrastan con la solicitud; si faltan dat
 o hay discrepancias, el programa conserva el documento original y no completa
 una propuesta con cifras del ejemplo. El formato admitido es el PDF anual de
 Personaliza Variable con resumen, desglose de asegurados y tabla hospitalaria A–D.
-Las solicitudes y resultados permanecen en el volumen hasta que el despacho los
+El historial permite abrir el detalle y eliminar solicitudes terminadas con sus PDF. Las solicitudes y resultados permanecen en el volumen hasta que el despacho los
 elimine; requiere administrar almacenamiento y respaldos según su operación.
+
+Los deducibles del formulario son los diez valores de la captura de GNP compartida: $21,000, $32,000, $45,000, $56,000, $68,000, $87,000, $111,000, $128,000, $175,000 y $233,000. Su disponibilidad final depende del portal al cotizar.
