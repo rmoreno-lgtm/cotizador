@@ -16,6 +16,7 @@ test('cotiza tres opciones secuenciales, guarda originales y no genera PDF con f
  try{
   const r=await ejecutarComparativo({id:'prueba',solicitud:solicitud(base)},dir,dependencias);assert.equal(r.opciones.length,3);assert.equal(generado,true);assert.equal(llamadas.length,3);assert.ok(llamadas.every(s=>!s.opciones&&s.cp===base.cp));
   for(let i=1;i<=3;i++)assert.equal(await fs.readFile(path.join(dir,'opcion-'+i,'gnp.pdf'),'utf8'),'%PDF-prueba');
+  for(let i=1;i<=3;i++)await fs.rm(path.join(dir,'opcion-'+i,'verificado.json'));
   generado=false;let n=0;
   await assert.rejects(ejecutarComparativo({id:'otra',solicitud:solicitud(base)},dir,{...dependencias,cotizar:async(s,p)=>{if(++n===2)throw new Error('portal no disponible');return dependencias.cotizar(s,p);}}),/Opción 2/);assert.equal(generado,false);
  }finally{await fs.rm(dir,{recursive:true,force:true});}
@@ -37,4 +38,16 @@ test('API protege y entrega cada original; PDF único no puede simular comparati
   assert.equal((await fetch(url+'/api/jobs/'+j.id+'/files/gnp-4',{headers})).status,404);
   const form=new FormData();form.append('solicitud',JSON.stringify(base));form.append('pdf',new Blob(['%PDF-prueba']),'gnp.pdf');assert.equal((await fetch(url+'/api/pdf',{method:'POST',headers:{Authorization:headers.Authorization},body:form})).status,400);
  }finally{cola.cerrada=true;server.closeAllConnections();await new Promise(r=>server.close(r));await fs.rm(dir,{recursive:true,force:true});}
+});
+test('reintento conserva PDF verificados y cotiza solo la opción pendiente en una sesión',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'reanudar-comparativo-'));let aperturas=0,cierres=0,llamadas=[];let fallar=true;
+ const deps={env:{},crearSesion:async()=>{aperturas++;return {cotizar:async(s,p)=>{llamadas.push(s.deducible);if(fallar&&s.deducible==='87000')throw Error('fallo tercera');await fs.writeFile(p,'%PDF-'+s.deducible);return s;},cerrar:async()=>{cierres++;}};},leer:async(p,s)=>datos(s),generar:async()=>path.join(dir,'comparativo.pdf')};
+ const j={id:'prueba',solicitud:solicitud(base)};
+ try{
+  await assert.rejects(ejecutarComparativo(j,dir,deps),/Opción 3/);assert.deepEqual(llamadas,['32000','56000','87000']);assert.equal(aperturas,1);assert.equal(cierres,1);
+  const original=await fs.readFile(path.join(dir,'opcion-1','gnp.pdf'));fallar=false;llamadas=[];
+  const r=await ejecutarComparativo(j,dir,deps);assert.equal(r.opciones.length,3);assert.deepEqual(llamadas,['87000']);assert.equal(aperturas,2);assert.equal(cierres,2);assert.deepEqual(await fs.readFile(path.join(dir,'opcion-1','gnp.pdf')),original);
+  llamadas=[];await fs.writeFile(path.join(dir,'opcion-2','gnp.pdf'),'%PDF-corrupto');await ejecutarComparativo(j,dir,deps);assert.deepEqual(llamadas,['56000']);
+  llamadas=[];const antiguo=new Date(Date.now()-7200000);await fs.utimes(path.join(dir,'opcion-1','gnp.pdf'),antiguo,antiguo);await ejecutarComparativo(j,dir,deps);assert.deepEqual(llamadas,['32000']);
+ }finally{await fs.rm(dir,{recursive:true,force:true});}
 });

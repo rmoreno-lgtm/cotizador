@@ -18,15 +18,8 @@ async function iniciarSesion(page, env) {
     throw new Error('No se pudo iniciar sesión en GNP. Verifica las credenciales, la conexión y los selectores GNP_USERNAME_SELECTOR, GNP_PASSWORD_SELECTOR y GNP_SUBMIT_SELECTOR en Railway.');
   }
 }
-async function cotizar(solicitud, destino, env=process.env) {
-  if (!env.GNP_USERNAME || !env.GNP_PASSWORD) throw new Error('Faltan GNP_USERNAME o GNP_PASSWORD en Railway.');
+async function cotizarEnPagina(page, solicitud, destino) {
   const datos={...solicitud,familiares:solicitud.familiares.map(f=>({...f}))};
-  const browser=await chromium.launch({headless:true,...(env.CHROMIUM_EXECUTABLE_PATH?{executablePath:env.CHROMIUM_EXECUTABLE_PATH}:{})});
-  try {
-    const context=await browser.newContext({acceptDownloads:true,viewport:{width:1440,height:1000}});
-    const page=await context.newPage();
-    page.setDefaultTimeout(45000);
-    await iniciarSesion(page,env);
     await page.getByRole('button').filter({ hasText: 'menu' }).click();
     await page.getByRole('link', { name: 'Cotiza y Emite' }).click();
     await page.getByRole('button').filter({ hasText: 'close' }).click();
@@ -133,6 +126,33 @@ async function cotizar(solicitud, destino, env=process.env) {
     await descarga.saveAs(destino);
     if (await descarga.failure()) throw new Error('No se pudo guardar el PDF descargado de GNP.');
     return datos;
-  } finally { await browser.close(); }
 }
-module.exports={cotizar,iniciarSesion};
+async function crearSesion(env=process.env, dependencias={}) {
+  if (!env.GNP_USERNAME || !env.GNP_PASSWORD) throw new Error('Faltan GNP_USERNAME o GNP_PASSWORD en Railway.');
+  const navegador=dependencias.chromium || chromium;
+  const browser=await navegador.launch({headless:true,...(env.CHROMIUM_EXECUTABLE_PATH?{executablePath:env.CHROMIUM_EXECUTABLE_PATH}:{})});
+  try {
+    const context=await browser.newContext({acceptDownloads:true,viewport:{width:1440,height:1000}});
+    const page=await context.newPage();page.setDefaultTimeout(45000);
+    await (dependencias.iniciarSesion || iniciarSesion)(page,env);
+    let realizadas=0,cerrada=false;
+    return {
+      async cotizar(solicitud,destino) {
+        if(cerrada)throw new Error('La sesión de cotización está cerrada.');
+        if(realizadas>0) {
+          // Reiniciar la navegación del portal, conservando contexto, cookies y sesión.
+          await page.goto('https://portalintermediarios.gnp.com.mx/sesion',{waitUntil:'domcontentloaded'});
+          await page.getByRole('button').filter({hasText:'menu'}).waitFor({state:'visible'});
+        }
+        realizadas++;
+        return (dependencias.cotizarEnPagina || cotizarEnPagina)(page,solicitud,destino);
+      },
+      async cerrar(){if(!cerrada){cerrada=true;await browser.close();}}
+    };
+  }catch(e){await browser.close();throw e;}
+}
+async function cotizar(solicitud,destino,env=process.env) {
+  const sesion=await crearSesion(env);
+  try{return await sesion.cotizar(solicitud,destino);}finally{await sesion.cerrar();}
+}
+module.exports={cotizar,iniciarSesion,crearSesion,cotizarEnPagina};

@@ -27,20 +27,38 @@ function documentoComparativo(logo,qr,{opciones:ds}) {
 <section class="page">${encabezado}<h1>El mismo gasto, distintas opciones</h1><p>Ejemplo con <b>${precio(gasto)}</b> de gastos cubiertos y reconocidos, en cada opción.</p>${ejemplo('A')}${ejemplo('B')}<p class="beneficio">Deducible: la cantidad inicial que pagas. Coaseguro: el porcentaje del gasto restante, hasta el tope que corresponde al nivel hospitalario.</p><p class="small">Ejemplo de una enfermedad cubierta, empezando con el deducible pendiente. Considera solamente deducible y coaseguro. Diferencias de honorarios respecto al tabulador y otros gastos no reconocidos pueden aumentar lo que pagas. El tabulador médico y el nivel hospitalario son conceptos distintos. Aplican condiciones de GNP.</p>${pie(2)}</section>
 <section class="page">${encabezado}<h1>Te acompañamos cuando más lo necesitas</h1><h2>La diferencia de QUILLUM</h2><p>Atención personalizada para programación de cirugías, reembolsos y seguimiento durante tu hospitalización.</p><h2>Antes de elegir</h2><p><b>Deducible:</b> compara cuánto puedes asumir ante una enfermedad cubierta.</p><p><b>Tabulador médico:</b> define los límites de honorarios reconocidos por GNP. Cambiarlo puede modificar la diferencia que pagues al médico.</p><p><b>Acceso y nivel hospitalario:</b> consulta que tus hospitales de preferencia correspondan a la configuración elegida.</p>${ds.every(d=>d.altaSolicitada||d.altaConfirmada)?'<p class="beneficio"><b>Alta Tecnología y Medicina de Vanguardia</b><br>Evita la participación adicional en determinados procedimientos e insumos especializados. Aplican condiciones de GNP.</p>':''}<h2>Beneficios para tu día a día</h2><p>${ds.every(d=>d.asistencias.dental)?'Asistencia dental: revisión y diagnóstico, dos limpiezas al año y descuentos.':'Consulta el alcance de asistencia dental en los originales.'}</p><p>${ds.every(d=>d.asistencias.psicologica)?'Apoyo psicológico: dos videoconsultas mensuales durante la vigencia.':'Consulta el alcance de apoyo psicológico en los originales.'}</p><p>${ds.every(d=>d.asistencias.movil)?'Médica Móvil: orientación telefónica y videoconsultas ilimitadas sin costo. Domicilio y ambulancia con copago.':'Consulta el alcance de Médica Móvil en los originales.'}</p><h2>¿Cuál opción prefieres?</h2><p>WhatsApp: <b>81 80 20 24 14</b> · Te ayudamos a revisar las diferencias.</p><img class="qr" src="${qr}" alt="WhatsApp QUILLUM"><p class="small">El comparativo resume los documentos originales; no sustituye las condiciones de la póliza.</p>${pie(3)}</section></body></html>`;
 }
-async function ejecutarComparativo(job,dir,{env,logoPath,cotizar,leer,generar}={}) {
-  cotizar=cotizar||require('./cotizador-gnp.cjs').cotizar;leer=leer||leerPdf;generar=generar||require('./propuesta.cjs').generarPropuesta;
-  const resultados=[];
+async function ejecutarComparativo(job,dir,{env,logoPath,cotizar,crearSesion,leer,generar}={}) {
+  crearSesion=crearSesion||require('./cotizador-gnp.cjs').crearSesion;leer=leer||leerPdf;generar=generar||require('./propuesta.cjs').generarPropuesta;
+  const resultados=[];let sesion;
+  try {
   for(const [i,o] of job.solicitud.opciones.entries()) {
     const carpeta=path.join(dir,'opcion-'+(i+1));await fs.mkdir(carpeta,{recursive:true});
     const pdf=path.join(carpeta,'gnp.pdf');const s={...job.solicitud,...o};delete s.opciones;delete s.modalidad;
     try {
-      const verificada=await cotizar(s,pdf,env);
+      let verificada,datosGuardados;
+      try {
+        const previa=JSON.parse(await fs.readFile(path.join(carpeta,'solicitud.json'),'utf8'));
+        const registro=JSON.parse(await fs.readFile(path.join(carpeta,'verificado.json'),'utf8'));
+        const {solicitud}=require('./solicitud.cjs');
+        const stat=await fs.stat(pdf);
+        const hash=crypto.createHash('sha256').update(await fs.readFile(pdf)).digest('hex');
+        if(JSON.stringify(solicitud(previa))===JSON.stringify(solicitud(s)) && registro.fuente?.sha256===hash && Date.now()-stat.mtimeMs<3600000) {
+          datosGuardados=await leer(pdf,previa);verificada=previa;
+        }
+      }catch{}
+      if(!datosGuardados) {
+        console.log('Comparativo: cotizando opción '+(i+1)+' de '+job.solicitud.opciones.length+' en sesión compartida.');
+        if(!cotizar && !sesion)sesion=await crearSesion(env);
+        verificada=await (cotizar?cotizar(s,pdf,env):sesion.cotizar(s,pdf));
+      }
       await fs.writeFile(path.join(carpeta,'solicitud.json'),JSON.stringify(verificada,null,2));
-      const datos=await leer(pdf,verificada);
+      if(datosGuardados)console.log('Comparativo: reutilizando PDF verificado de opción '+(i+1)+'.');
+      const datos=datosGuardados || await leer(pdf,verificada);
       datos.fuente={sha256:crypto.createHash('sha256').update(await fs.readFile(pdf)).digest('hex')};
       await fs.writeFile(path.join(carpeta,'verificado.json'),JSON.stringify(datos,null,2));resultados.push(datos);
     } catch(e){throw new Error('Opción '+(i+1)+': '+e.message+' No se generó el comparativo completo.');}
   }
+  }finally{if(sesion)await sesion.cerrar();}
   validarComparacion(resultados);
   const nombre='QUILLUM-Comparativo-'+job.id;
   const archivo=await generar({schemaVersion:1,folio:resultados.map(d=>d.folio).join('-'),opciones:resultados},{baseDir:dir,nombreSalida:nombre,abrir:false,logoPath,executablePath:env?.CHROMIUM_EXECUTABLE_PATH,documento:documentoComparativo});
