@@ -11,21 +11,61 @@ function validarComparacion(datos) {
     if(!d.niveles.some(n=>n.nivel==='A') || !d.niveles.some(n=>n.nivel==='B'))throw new Error('Faltan niveles hospitalarios para comparar.');
   }
 }
+function cambiosOpcion(base,d) {
+  const diferencias=[];
+  if(d.niveles.find(n=>n.nivel==='A').deducible!==base.niveles.find(n=>n.nivel==='A').deducible)diferencias.push('deducible');
+  if(d.tabulador!==base.tabulador)diferencias.push('tabulador médico');
+  return diferencias;
+}
 function documentoComparativo(logo,qr,{opciones:ds}) {
   validarComparacion(ds);
-  const base=ds[0], precio=x=>'$'+dinero(x,true);
-  const encabezado=`<header><img src="${logo}" alt="QUILLUM"><div>COMPARATIVO PERSONALIZADO<br>Aseguradora: GNP</div></header>`;
-  const pie=n=>`<footer>QUILLUM · Propuesta informativa · Folios ${ds.map(d=>html(d.folio)).join(' / ')}<span>${n} / 3</span></footer>`;
-  const tabla=filas=>`<table><thead><tr><th>Concepto</th>${ds.map((_,i)=>'<th>Opción '+(i+1)+'</th>').join('')}</tr></thead><tbody>${filas.map(([titulo,fn])=>'<tr><td>'+titulo+'</td>'+ds.map(d=>'<td>'+fn(d)+'</td>').join('')+'</tr>').join('')}</tbody></table>`;
-  const nivel=(d,n)=>d.niveles.find(x=>x.nivel===n);
-  const filas=[['Prima anual',d=>'<b>'+precio(d.monto.total)+'</b>'],['Deducible base · nivel A',d=>precio(nivel(d,'A').deducible)],['Tabulador médico',d=>html(d.tabulador)],['Acceso hospitalario',d=>html(d.acceso)],['Suma asegurada',d=>precio(d.suma)],['Alta Tecnología',d=>d.altaConfirmada?'Confirmada en PDF':d.altaSolicitada?'Solicitada; revisar original':'No solicitada'],['Folio GNP',d=>html(d.folio)],['Vigencia de cotización',d=>html(d.vence)]];
+  const {crearVista}=require('./integracion.cjs');
+  const base=ds[0],v=crearVista(base),precio=x=>'$'+dinero(x,true),nivel=(d,n)=>d.niveles.find(x=>x.nivel===n);
+  const estilo=require('node:fs').readFileSync(path.join(__dirname,'comparativo-estilo.css'),'utf8');
+  const encabezado=`<header><img class="logo" src="${logo}" alt="QUILLUM Seguros y Fianzas"><div class="insurer">PROPUESTA COMPARATIVA<br><b>Aseguradora: GNP</b><br>Seguro Médico ${html(base.plan)}</div></header>`;
+  const pie=n=>`<footer>QUILLUM · Folios GNP ${ds.map(d=>html(d.folio)).join(' / ')} · Propuesta informativa<span>${n} / 4</span></footer>`;
+  const tabla=filas=>`<table class="compare-table"><thead><tr><th>Concepto</th>${ds.map((_,i)=>'<th>Opción '+(i+1)+'</th>').join('')}</tr></thead><tbody>${filas.map(([titulo,fn,resaltar])=>`<tr${titulo==='Tu participación total'?' class="total-participacion"':''}><td>`+titulo+'</td>'+ds.map((d,i)=>`<td${i&&resaltar&&resaltar(d)?' class="changed"':''}>`+fn(d)+'</td>').join('')+'</tr>').join('')}</tbody></table>`;
+  const cambioPrima=d=>{
+    const delta=d.monto.total-base.monto.total;
+    return delta===0?'Misma prima anual que opción 1.':`${precio(Math.abs(delta))} ${delta<0?'menos':'más'} al año que opción 1.`;
+  };
+  const tarjetas=ds.map((d,i)=>{
+    const cambios=cambiosOpcion(base,d);
+    const etiqueta=i===0?'Opción de referencia':cambios.length?'Cambia '+cambios.join(' y '):'Mismo deducible y tabulador';
+    return `<div class="option"><h3>OPCIÓN ${i+1}</h3><span class="change">${etiqueta}</span><strong>${precio(d.monto.total)}</strong><p>Inversión anual total · MXN</p><p><b>Deducible base:</b> ${precio(nivel(d,'A').deducible)}<br><b>Tabulador médico:</b> ${html(d.tabulador)}</p>${i?'<p>'+cambioPrima(d)+'</p>':'<p>Las diferencias de las otras opciones se muestran respecto a esta configuración.</p>'}</div>`;
+  }).join('');
   const gasto=Math.max(20000000,...ds.flatMap(d=>['A','B'].map(n=>nivel(d,n).deducible+10000000)));
-  const ejemplo=n=>`<h2>Nivel hospitalario ${n}</h2>`+tabla([['Deducible',d=>precio(nivel(d,n).deducible)],['Coaseguro / tope',d=>nivel(d,n).porcentaje+'% / '+precio(nivel(d,n).tope)],['Coaseguro en este ejemplo',d=>precio(calculo(gasto,nivel(d,n)).coaseguro)],['Tu participación estimada',d=>'<b>'+precio(calculo(gasto,nivel(d,n)).total)+'</b>']]);
-  return `<!doctype html><html lang="es"><meta charset="utf-8"><title>Comparativo QUILLUM</title><style>
-@page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#0a3052;print-color-adjust:exact}.page{width:210mm;height:297mm;padding:14mm 15mm 20mm;position:relative;break-after:page}.page:last-child{break-after:auto}header{height:85px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #f68a21}header img{width:135px;height:78px;object-fit:contain}header div{font-size:10px;text-align:right;line-height:1.7}h1{font-size:27px;margin:20px 0 10px}h2{font-size:17px;margin:20px 0 10px}p{font-size:12px;line-height:1.6;color:#506276}table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}th{background:#0a3052;color:white}td,th{padding:10px 7px;border-bottom:1px solid #dce5ed;text-align:left;overflow-wrap:anywhere}th:first-child,td:first-child{width:31%}tbody tr:nth-child(odd){background:#f3f7fa}b{color:#0a3052}.beneficio{background:#fff3e6;padding:12px;border-left:4px solid #f68a21;font-size:12px;line-height:1.6}.small{font-size:10px}footer{position:absolute;bottom:10mm;left:15mm;right:15mm;border-top:1px solid #dce5ed;padding-top:8px;font-size:8px}footer span{float:right}.qr{width:100px;height:100px}
-</style><body><section class="page">${encabezado}<h1>Más opciones para decidir con claridad</h1><h2>${html(base.nombre)}</h2><p>${html(base.plan)} · ${base.asegurados.length} asegurado(s) · CP ${html(base.asegurados[0].cp)}</p><p>Comparamos ${ds.length} configuraciones para las mismas personas. Revisa el precio y la participación que eliges asumir.</p>${tabla(filas)}${ds.every(d=>d.coberturas.includes('Cero deducible por accidente cubierto'))?'<p class="beneficio"><b>Cero deducible por accidente</b><br>En accidente cubierto no pagas deducible.</p>':''}<p class="small">Importes anuales según los PDF originales de GNP. La cotización está sujeta a aceptación y condiciones de contratación.</p>${pie(1)}</section>
-<section class="page">${encabezado}<h1>El mismo gasto, distintas opciones</h1><p>Ejemplo con <b>${precio(gasto)}</b> de gastos cubiertos y reconocidos, en cada opción.</p>${ejemplo('A')}${ejemplo('B')}<p class="beneficio">Deducible: la cantidad inicial que pagas. Coaseguro: el porcentaje del gasto restante, hasta el tope que corresponde al nivel hospitalario.</p><p class="small">Ejemplo de una enfermedad cubierta, empezando con el deducible pendiente. Considera solamente deducible y coaseguro. Diferencias de honorarios respecto al tabulador y otros gastos no reconocidos pueden aumentar lo que pagas. El tabulador médico y el nivel hospitalario son conceptos distintos. Aplican condiciones de GNP.</p>${pie(2)}</section>
-<section class="page">${encabezado}<h1>Te acompañamos cuando más lo necesitas</h1><h2>La diferencia de QUILLUM</h2><p>Atención personalizada para programación de cirugías, reembolsos y seguimiento durante tu hospitalización.</p><h2>Antes de elegir</h2><p><b>Deducible:</b> compara cuánto puedes asumir ante una enfermedad cubierta.</p><p><b>Tabulador médico:</b> define los límites de honorarios reconocidos por GNP. Cambiarlo puede modificar la diferencia que pagues al médico.</p><p><b>Acceso y nivel hospitalario:</b> consulta que tus hospitales de preferencia correspondan a la configuración elegida.</p>${ds.every(d=>d.altaSolicitada||d.altaConfirmada)?'<p class="beneficio"><b>Alta Tecnología y Medicina de Vanguardia</b><br>Evita la participación adicional en determinados procedimientos e insumos especializados. Aplican condiciones de GNP.</p>':''}<h2>Beneficios para tu día a día</h2><p>${ds.every(d=>d.asistencias.dental)?'Asistencia dental: revisión y diagnóstico, dos limpiezas al año y descuentos.':'Consulta el alcance de asistencia dental en los originales.'}</p><p>${ds.every(d=>d.asistencias.psicologica)?'Apoyo psicológico: dos videoconsultas mensuales durante la vigencia.':'Consulta el alcance de apoyo psicológico en los originales.'}</p><p>${ds.every(d=>d.asistencias.movil)?'Médica Móvil: orientación telefónica y videoconsultas ilimitadas sin costo. Domicilio y ambulancia con copago.':'Consulta el alcance de Médica Móvil en los originales.'}</p><h2>¿Cuál opción prefieres?</h2><p>WhatsApp: <b>81 80 20 24 14</b> · Te ayudamos a revisar las diferencias.</p><img class="qr" src="${qr}" alt="WhatsApp QUILLUM"><p class="small">El comparativo resume los documentos originales; no sustituye las condiciones de la póliza.</p>${pie(3)}</section></body></html>`;
+  const diferenciaParticipacion=(d,n)=>{
+    const delta=calculo(gasto,nivel(d,n)).total-calculo(gasto,nivel(base,n)).total;
+    return delta===0?'Misma participación':precio(Math.abs(delta))+(delta<0?' menos':' más');
+  };
+  const ejemplo=n=>`<h2>Mismo gasto en nivel hospitalario ${n}</h2>`+tabla([
+    ['1. Deducible a tu cargo',d=>precio(calculo(gasto,nivel(d,n)).deducible),d=>nivel(d,n).deducible!==nivel(base,n).deducible],
+    ['2. Gasto restante',d=>precio(calculo(gasto,nivel(d,n)).base)],
+    ['3. Coaseguro / tope',d=>nivel(d,n).porcentaje+'% / '+precio(nivel(d,n).tope)],
+    ['Coaseguro a tu cargo',d=>precio(calculo(gasto,nivel(d,n)).coaseguro)],
+    ['Tu participación total',d=>precio(calculo(gasto,nivel(d,n)).total)],
+    ['Frente a opción 1',d=>d===base?'Referencia':diferenciaParticipacion(d,n)]
+  ]);
+  return `<!doctype html><html lang="es"><meta charset="utf-8"><title>Comparativo QUILLUM</title><style>${estilo}</style><body>
+<section class="page">${encabezado}<div class="eyebrow">01 / PROTECCIÓN Y ACOMPAÑAMIENTO</div>
+<h1>Tu protección médica,<br>con el respaldo de QUILLUM.</h1><p>Preparada para <b>${html(base.nombre)}</b>.<br>${v.perfilHtml}</p>
+${v.beneficiosHtml}
+<div class="row"><div class="card"><h3>Suma asegurada básica</h3><strong>${precio(base.suma)}</strong><p>Por año póliza, por asegurado.</p></div><div class="card"><h3>Protección en todas las opciones</h3><strong>Acceso ${html(base.acceso)}</strong><p>Mismos asegurados y coberturas comunes. Comparamos deducibles y tabuladores.</p></div></div>
+<h2>También te acompaña en el día a día</h2><div class="row asistencias"><div class="card"><h3>Asistencia dental</h3><p>${v.dentalHtml}</p></div><div class="card"><h3>Apoyo psicológico</h3><p>${v.psicologicaHtml}</p></div><div class="card"><h3>Médica Móvil</h3><p>${v.movilHtml}</p></div></div><p class="small">Aplican condiciones, disponibilidad y alcance de cada servicio.</p>
+<div class="strip"><h3>El respaldo de QUILLUM, cuando más lo necesitas</h3><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p></div>
+<h2>Una misma protección, distintas formas de participar</h2><p>En las siguientes páginas encontrarás ${ds.length} opciones, sus diferencias de precio y ejemplos de lo que pagarías al usar tu seguro.</p>${pie(1)}</section>
+<section class="page">${encabezado}<div class="eyebrow">02 / ELIGE TU CONFIGURACIÓN</div><h1>¿Qué cambia entre tus opciones?</h1><p>Cada opción adicional se compara con la opción 1. Los campos resaltados en naranja muestran cambios.</p><div class="options">${tarjetas}</div>
+${tabla([
+ ['Deducible base · nivel A',d=>precio(nivel(d,'A').deducible),d=>nivel(d,'A').deducible!==nivel(base,'A').deducible],
+ ['Tabulador médico',d=>html(d.tabulador),d=>d.tabulador!==base.tabulador],
+ ['Acceso hospitalario',d=>html(d.acceso)],['Folio GNP',d=>html(d.folio)],['Válida hasta',d=>html(d.vence)]
+])}
+<div class="strip"><h3>Si cambia el deducible</h3><p>Cambia la cantidad inicial que asumes en una enfermedad cubierta. Un deducible mayor puede reducir la prima, pero el precio mostrado es el que cotizó GNP.</p></div>
+<div class="strip"><h3>Si cambia el tabulador médico</h3><p>Cambian los límites de honorarios médicos reconocidos por GNP. No es el nivel hospitalario A–D. Confirma si los honorarios de tu médico están dentro del tabulador elegido.</p></div><p class="small">Las primas anuales incluyen los conceptos reflejados en cada PDF original de GNP. Ninguna opción se presenta como la mejor para todos: revisa tu presupuesto y médicos de preferencia.</p>${pie(2)}</section>
+<section class="page participation">${encabezado}<div class="eyebrow">03 / CUÁNTO PARTICIPARÍAS AL USAR TU SEGURO</div><h1>El mismo gasto,<br>distintas participaciones.</h1><p>Ejemplo con <b>${precio(gasto)}</b> de gastos cubiertos y reconocidos en cada opción.</p><p class="small"><b>Tu participación = deducible + coaseguro.</b> El coaseguro se calcula sobre el gasto restante y se limita al tope del nivel hospitalario.</p>${ejemplo('A')}${ejemplo('B')}
+<p class="difference">Si solo cambia el tabulador y la tabla de deducible y coaseguro es igual, este ejemplo muestra la misma participación. La diferencia de honorarios médicos se revisa aparte con el médico y GNP.</p><p class="small">Ejemplo para una enfermedad cubierta, sin deducible previamente pagado. Considera gastos reconocidos; diferencias de honorarios y gastos no cubiertos se pagan aparte. La prima anual es el precio del seguro y no está incluida en la participación de este ejemplo. Aplican condiciones de GNP.</p>${pie(3)}</section>
+<section class="page">${encabezado}<div class="eyebrow">04 / TU PLAN Y EL SERVICIO DE TU DESPACHO</div><h1>Respaldo para tu salud.<br>Acompañamiento para ti.</h1><h2>Coberturas descritas en tus cotizaciones</h2><p>La cobertura básica contempla diagnóstico, honorarios médicos, hospitalización, cirugía, medicamentos y rehabilitación, conforme a condiciones y límites.</p><div class="card"><h3>Adicionales expresamente descritos por GNP</h3><p>${v.adicionalesHtml}</p></div><p class="small">${v.altaHtml}</p><h2>El respaldo de QUILLUM</h2><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p><p>Contamos con convenios con <b>Grupo Muguerza, Grupo Auna, Grupo Ángeles y Hospitaria, entre otros</b>, que nos permiten coordinar la atención y facilitar la gestión de trámites.</p><p class="small">El acceso y la cobertura están sujetos al plan contratado, al hospital y a la autorización de GNP. Los convenios del despacho no amplían la cobertura de la póliza.</p><div class="contact"><img src="${qr}" alt="QR de WhatsApp"><div><h3>Revisemos juntos tus opciones</h3><p>Escanea el QR o pulsa el número.</p><a href="https://wa.me/528180202414">81 80 20 24 14</a></div></div><p class="small">Antes de contratar, confirma hospitales, coberturas, exclusiones y periodos de espera. Conserva los originales de GNP junto con este comparativo; es informativo y no es una póliza. La aceptación, tarifa y alcance están sujetos a suscripción y condiciones contractuales.</p>${pie(4)}</section></body></html>`;
 }
 async function ejecutarComparativo(job,dir,{env,logoPath,cotizar,crearSesion,leer,generar}={}) {
   crearSesion=crearSesion||require('./cotizador-gnp.cjs').crearSesion;leer=leer||leerPdf;generar=generar||require('./propuesta.cjs').generarPropuesta;
@@ -65,4 +105,4 @@ async function ejecutarComparativo(job,dir,{env,logoPath,cotizar,crearSesion,lee
   await fs.writeFile(path.join(dir,'comparativo.verificado.json'),JSON.stringify(resultados,null,2));
   return {propuesta:path.relative(dir,archivo),folio:resultados.map(d=>d.folio).join(' / '),advertencias:resultados.flatMap((d,i)=>d.advertencias.map(a=>'Opción '+(i+1)+': '+a)),opciones:resultados.map(d=>({folio:d.folio,deducible:String(d.niveles.find(n=>n.nivel==='A').deducible/100),tabulador:d.tabulador,totalAnual:d.monto.total,niveles:d.niveles}))};
 }
-module.exports={ejecutarComparativo,documentoComparativo,validarComparacion};
+module.exports={ejecutarComparativo,documentoComparativo,validarComparacion,cambiosOpcion};

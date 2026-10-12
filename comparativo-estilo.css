@@ -1,0 +1,68 @@
+
+@page { size:A4; margin:0; }
+* { box-sizing:border-box; }
+body { margin:0; color:#0a3052; font-family:Arial,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+.page { width:210mm; height:297mm; padding:12mm 16mm 18mm; position:relative; break-after:page; overflow:hidden; }
+.page:last-child { break-after:auto; }
+header { height:102px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #dce5ed; padding-bottom:12px; }
+.logo { width:130px; height:88px; object-fit:contain; }
+.insurer { font-size:10px; line-height:1.7; text-align:right; color:#506276; }
+.eyebrow { margin:18px 0 8px; font-size:10px; letter-spacing:1px; color:#104b74; }
+h1 { font-size:28px; line-height:1.15; margin:12px 0; }
+h2 { font-size:16px; margin:18px 0 9px; }
+h3 { font-size:12px; margin:0 0 6px; }
+p,li { font-size:12px; line-height:1.5; color:#506276; margin:7px 0; }
+.small { font-size:10px; line-height:1.45; }
+.row { display:flex; gap:10px; }
+.card { background:#f0f5f9; border-radius:10px; padding:13px; flex:1; }
+.card strong { font-size:17px; display:block; margin:7px 0; }
+.card p { font-size:11px; }
+.hero { background:#0a3052; border-radius:12px; padding:17px 20px; color:white; margin:18px 0 10px; display:flex; justify-content:space-between; align-items:center; }
+.hero strong { display:block; font-size:32px; margin-top:6px; }
+.hero p { color:white; font-size:11px; }
+.strip { border-left:4px solid #ef8924; background:#f8fafc; padding:12px 15px; margin-top:15px; }
+.strip p { font-size:11px; }
+table { width:100%; border-collapse:collapse; margin:12px 0; font-size:12px; }
+td,th { text-align:left; padding:10px; }
+th { background:#0a3052; color:white; font-size:11px; }
+tr:nth-child(even) { background:#f0f5f9; }
+.amount { text-align:right; white-space:nowrap; }
+.example { border-radius:10px; background:#f0f5f9; padding:14px; margin-top:16px; }
+.example table { margin:6px 0; font-size:11px; }
+.example td { padding:6px; }
+.example b { font-size:12px; }
+.contact { display:flex; gap:18px; align-items:center; padding:16px; background:#0a3052; color:white; border-radius:12px; margin-top:20px; }
+.contact img { width:98px; height:98px; background:white; }
+.contact p { color:white; }
+.contact a { color:white; text-decoration:none; font-weight:bold; font-size:20px; }
+footer { position:absolute; left:16mm; right:16mm; bottom:11mm; border-top:1px solid #dce5ed; padding-top:9px; font-size:9px; color:#506276; }
+footer span { float:right; }
+.eyebrow { border-left:3px solid #ef8924; padding-left:9px; }
+.hero { border-left:6px solid #ef8924; }
+.difference { color:#8b4009; background:#fff1e3; padding:8px; border-left:3px solid #ef8924; font-size:11px; }
+.comparison tr:last-child { background:#fff1e3; }
+.example { padding:12px; margin-top:12px; }
+.example td { padding:5px; }
+.keybenefits { display:flex; gap:10px; margin:10px 0; }
+.keybenefit { flex:1; border-left:3px solid #ef8924; background:#fff1e3; border-radius:6px; padding:8px 10px; }
+.keybenefit p { font-size:10px; line-height:1.35; margin:4px 0 0; }
+.keybenefit h3 { font-size:11px; margin:0; }
+.asistencias .card { border-top:3px solid #ef8924; }
+.asistencias h3 { color:#104b74; font-size:13px; }
+
+.options { display:flex; gap:10px; margin:14px 0; }
+.option { flex:1; padding:12px; border-radius:10px; background:#f0f5f9; border-top:4px solid #ef8924; }
+.option strong { display:block; font-size:22px; margin:8px 0; }
+.option p { font-size:10px; line-height:1.45; }
+.change { display:block; font-size:10px; font-weight:bold; color:#8b4009; background:#fff1e3; padding:6px; margin:6px 0; }
+.compare-table { table-layout:fixed; font-size:11px; }
+.compare-table th:first-child,.compare-table td:first-child { width:31%; }
+.compare-table td,.compare-table th { padding:8px; overflow-wrap:anywhere; }
+.compare-table .changed { background:#fff1e3; font-weight:bold; }
+.participation .compare-table { margin:8px 0; font-size:10px; }
+.participation .compare-table td { padding:6px; }
+.participation tr:last-child { background:#fff1e3; font-weight:bold; }
+.participation h2 { margin-top:14px; }
+.participation h1 { font-size:25px; }
+
+.participation .total-participacion { background:#fff1e3; font-weight:bold; }
