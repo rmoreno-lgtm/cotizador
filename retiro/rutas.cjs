@@ -26,7 +26,9 @@ function registrar(app,{limpiarError,env}){
   limpiar();const b=borradores.get(req.params.id);if(!b)return res.status(404).send('El borrador expiró. Vuelve a cargar la ilustración.');
   const enfoque=req.query.enfoque||'retiro';if(!ENFOQUES[enfoque])return res.status(400).send('Enfoque inválido.');
   res.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox");
-  res.type('html').send(vista(b.modelo,enfoque,b.logos));
+  const anio=req.query.anio===undefined?undefined:Number(req.query.anio);
+  if(anio!==undefined && (!Number.isSafeInteger(anio)||!b.modelo.tablaValida||!b.modelo.tabla.some(f=>f.anio===anio)))return res.status(400).send('Año de ejemplo inválido.');
+  res.type('html').send(vista(b.modelo,enfoque,b.logos,anio));
  });
  app.delete('/api/retiro/:id',(req,res)=>{borradores.delete(req.params.id);res.json({ok:true});});
 }

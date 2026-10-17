@@ -1,5 +1,7 @@
 const {PDFParse}=require('pdf-parse');
 const crypto=require('node:crypto');
+const {ilustracion}=require('./ilustracion.cjs');
+const {ocr}=require('./ocr.cjs');
 const ENFOQUES={
  retiro:{nombre:'Retiro personal',titulo:'Proteges hoy.',subtitulo:'Construyes tu retiro.',texto:'Un patrimonio para disfrutar tu futuro con tranquilidad.',icono:'☀'},
  independencia:{nombre:'Independencia',titulo:'Decides hoy.',subtitulo:'Construyes tu independencia.',texto:'Un plan para ampliar tus posibilidades y elegir tu camino.',icono:'↗'},
@@ -9,6 +11,7 @@ const ENFOQUES={
 function analizar(texto) {
  if(typeof texto!=='string' || texto.length>1500000)throw Error('El documento excede el límite de lectura.');
  if(!/proyecta/i.test(texto) || !/\bGNP\b/i.test(texto))throw Error('No se identifica una ilustración de Proyecta GNP. Revisa el documento.');
+ const completo=ilustracion(texto);if(completo)return completo;
  const campos={};const incidencias=[];
  // Solo etiquetas explícitas. No se asignan columnas de protección o valores sin una muestra validada.
  const extraer=(nombre,regex)=>{
@@ -32,6 +35,15 @@ function analizar(texto) {
 async function leer(buffer){
  if(!buffer?.subarray(0,5).equals(Buffer.from('%PDF-')))throw Error('Adjunta un PDF válido.');
  const parser=new PDFParse({data:buffer});
- try{const out=await parser.getText();if(!out.text.trim())throw Error('El PDF no contiene texto legible; adjunta una ilustración con texto.');return {...analizar(out.text),sha256:crypto.createHash('sha256').update(buffer).digest('hex')};}finally{await parser.destroy();}
+ try{
+  const info=await parser.getInfo();if(info.total>10)throw Error('La ilustración admite hasta 10 páginas.');
+  const out=await parser.getText();
+  // PDF escaneado o mixto: no confundir marcadores de página con texto extraíble.
+  const requiereOcr=out.pages.some(p=>p.text.replace(/\s/g,'').length<30);
+  const texto=requiereOcr?await ocr(parser,info.total):out.text;
+  const modelo=analizar(texto);
+  if(requiereOcr)modelo.incidencias.unshift('Lectura mediante OCR: revisar cifras y coberturas contra el PDF original antes de emitir.');
+  return {...modelo,metodoLectura:requiereOcr?'ocr':'texto',sha256:crypto.createHash('sha256').update(buffer).digest('hex')};
+ }finally{await parser.destroy();}
 }
 module.exports={analizar,leer,ENFOQUES};
