@@ -93,6 +93,8 @@ async function crearApp({env=process.env,ejecutor}={}) {
     deducibles:['21000','32000','45000','56000','68000','87000','111000','128000','175000','233000'],tabuladores:['A','B','C','D'],accesos:['Esencial','Amplio'],
     nota:'Las opciones disponibles se validan en GNP al cotizar. WhatsApp todavía no está conectado.'
   }));
+  app.get('/retiro.js',(req,res)=>res.sendFile(path.join(__dirname,'web/retiro.js')));
+  require('./retiro/rutas.cjs').registrar(app,{limpiarError,env});
   app.post('/api/logo',uploadLogo.single('logo'),async(req,res)=>{
     if(!png(req.file?.buffer))return res.status(400).json({error:'Adjunta tu logo como PNG real, de hasta 2 MB.'});
     const temp=logoPath+'.'+crypto.randomUUID();await fs.writeFile(temp,req.file.buffer);await fs.rename(temp,logoPath);res.json({ok:true});
