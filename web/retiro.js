@@ -17,12 +17,17 @@
    const lista=$('retiro-incidencias');lista.replaceChildren();
    for(const texto of data.modelo.incidencias){const li=document.createElement('li');li.textContent=texto;lista.append(li);}
    const evidencias=$('retiro-evidencias');evidencias.replaceChildren();
-   for(const [nombre,campo]of Object.entries(data.modelo.campos)){const p=document.createElement('p');p.textContent=nombre+': '+campo.valor+' · Texto detectado: '+campo.fuente;evidencias.append(p);}
+   const nombres={cliente:'Cliente',edad:'Edad inicial',inflacion:'Inflación ilustrada',plazoPago:'Años de aportaciones',edadVencimiento:'Edad al vencimiento',moneda:'Moneda',aportacion:'Aportación inicial anual',plazoPlan:'Plazo del plan',proteccionInicial:'Protección inicial',ahorro:'Valor final proyectado'};
+   const dinero=n=>'$'+(Number(n)/100).toLocaleString('es-MX',{maximumFractionDigits:2});
+   for(const [nombre,campo]of Object.entries(data.modelo.campos)){const p=document.createElement('p');const valor=['proteccionInicial','ahorro'].includes(nombre)?dinero(campo.valor):campo.valor+(nombre==='inflacion'?'%':'');p.textContent=(nombres[nombre]||nombre)+': '+valor+' · Fuente: '+campo.fuente;evidencias.append(p);}
+   if(data.modelo.coberturas?.length){const h=document.createElement('h3');h.textContent='Coberturas identificadas en la ilustración';evidencias.append(h);
+    for(const cobertura of data.modelo.coberturas){const p=document.createElement('p');p.textContent=cobertura.nombre+(cobertura.suma!==undefined?' · Suma inicial: '+dinero(cobertura.suma):cobertura.porcentaje!==undefined?' · '+cobertura.porcentaje+'% · Amparada':' · Amparada')+(cobertura.aportacion!==undefined?' · Aportación inicial anual: '+dinero(cobertura.aportacion):'');evidencias.append(p);}
+   }
    const anios=$('retiro-anio');anios.replaceChildren();anios.disabled=!data.modelo.tablaValida;
    if(data.modelo.tablaValida){for(const fila of data.modelo.tabla)anios.add(new Option('Año '+fila.anio+' · Edad '+fila.edad,fila.anio));anios.value=String(Math.min(6,data.modelo.tabla.length));}
    else anios.add(new Option('Disponible al leer la tabla',''));
    mostrar();$('retiro-vista').hidden=false;
-   aviso('Borrador disponible durante 30 minutos. Revisa el texto detectado; la extracción aún necesita validarse con una ilustración real. La generación final está pendiente.');
+   aviso((data.modelo.tablaValida?'Ilustración leída: '+data.modelo.tabla.length+' años. ':'Hay datos por revisar en la ilustración. ')+'El borrador estará disponible durante 30 minutos. Revisa los datos y las observaciones antes de emitir la propuesta final.');
   }catch(e){aviso(e.message);}finally{$('retiro-cargar').disabled=false;}
  });
  $('retiro-cerrar').addEventListener('click',async()=>{try{await eliminar();$('retiro-vista').hidden=true;$('retiro-vista').removeAttribute('src');$('retiro-form').reset();$('retiro-anio').disabled=true;$('retiro-incidencias').replaceChildren();$('retiro-evidencias').replaceChildren();aviso('Borrador eliminado.');}catch{aviso('No se pudo cerrar el borrador.');}});

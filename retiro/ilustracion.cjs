@@ -39,17 +39,25 @@ function ilustracion(texto){
  const exencion=/^.*Exencion de Pago de Primas por Invalidez Total y Permanente\s+Amparada\s+(\$[\d,]+(?:\.\d{2})?)\s*$/mi.exec(t);
  if(exencion)coberturas.push({tipo:'exencion',nombre:'Exención de pago de primas por invalidez total y permanente',aportacion:money(exencion[1]),fuente:exencion[0]});
  for(const [tipo,nombre,re]of [
+  ['invalidez','Invalidez Sin Espera',/^\s*Invalidez Sin Espera\s+(\$[\d,]+(?:\.\d{2})?)\s+(\$[\d,]+(?:\.\d{2})?)\s*$/mi],
   ['fallecimiento','Protección por fallecimiento / supervivencia',/^.*Proteccion por Fallecimiento\s*\/\s*Supervivencia\s+(\$[\d,]+(?:\.\d{2})?)\s+(\$[\d,]+(?:\.\d{2})?)\s*$/mi],
   ['seguridad','Seguridad en Vida',/^.*Seguridad en Vida\*?\s+(\$[\d,]+(?:\.\d{2})?)\s+Sin Costo\s*$/mi],
   ['gastos','Cláusula de Últimos Gastos',/^.*Clausula de Ultimos Gastos\*?\s+(\$[\d,]+(?:\.\d{2})?)\s+Sin Costo\s*$/mi]
  ]){const m=re.exec(t);if(m)coberturas.push({tipo,nombre,suma:money(m[1]),...(m[2]?{aportacion:money(m[2])}:{}),fuente:m[0].trim()});}
- const incremento=/^.*Incremento No Fumador\s+(\d{1,2}(?:\.\d+)?)%\s+Amparada\s+Sin Costo\s*$/mi.exec(t);
- if(incremento)coberturas.push({tipo:'noFumador',nombre:'Incremento No Fumador',porcentaje:Number(incremento[1]),fuente:incremento[0].trim()});
+ for(const [tipo,nombre]of [['noFumador','Incremento No Fumador'],['mujer','Incremento Mujer']]){
+  const incremento=new RegExp('^.*'+nombre+'\\s+(\\d{1,2}(?:\\.\\d+)?)%\\s+Amparada\\s+Sin Costo\\s*$','mi').exec(t);
+  if(incremento)coberturas.push({tipo,nombre,porcentaje:Number(incremento[1]),fuente:incremento[0].trim()});
+ }
+ const invalidez=coberturas.find(c=>c.tipo==='invalidez');
+ if(invalidez){invalidez.ambitoSuma='inicial';invalidez.sumasPorAnio=null;}
  const inicial=coberturas.find(c=>c.tipo==='fallecimiento');
  if(inicial && tabla[0] && inicial.suma!==tabla[0].proteccion)error('La protección inicial no coincide con la tabla.');
- if(exencion && inicial?.aportacion && tabla[0] && exencion && money(exencion[1])+inicial.aportacion!==tabla[0].aportacion)error('Las aportaciones de coberturas no coinciden con la prima inicial.');
+ if(inicial?.aportacion!==undefined && tabla[0]){
+  const aportaciones=coberturas.filter(c=>c.aportacion!==undefined).reduce((total,c)=>total+c.aportacion,0);
+  if(Math.abs(aportaciones-tabla[0].aportacion)>100)error('Las aportaciones de coberturas identificadas no coinciden con la prima inicial; revisar si falta leer otra cobertura.');
+ }
  // No convertir ninguna columna de protección por fallecimiento en suma de invalidez.
- if(/Invalidez Sin Espera/i.test(t))incidencias.push('Se menciona Invalidez Sin Espera: revisar contratación y sumas por año antes de mostrar una indemnización.');
+ if(/Invalidez Sin Espera/i.test(t) && !coberturas.some(c=>c.tipo==='invalidez'))incidencias.push('Se menciona Invalidez Sin Espera: revisar contratación y sumas por año antes de mostrar una indemnización.');
  if(!coberturas.length)incidencias.push('No se identificaron filas completas de coberturas contratadas.');
  const definicion=/Proteccion Contratada\s*:\s*Cantidad que se entregara al final del plazo contratado o antes si ocurre el fallecimiento del Asegurado/i.exec(t);
  fuentes.fallecimiento=definicion?.[0]||null;

@@ -93,6 +93,7 @@ async function crearApp({env=process.env,ejecutor}={}) {
     deducibles:['21000','32000','45000','56000','68000','87000','111000','128000','175000','233000'],tabuladores:['A','B','C','D'],accesos:['Esencial','Amplio'],
     nota:'Las opciones disponibles se validan en GNP al cotizar. WhatsApp todavía no está conectado.'
   }));
+  app.get('/navegacion.js',(req,res)=>res.sendFile(path.join(__dirname,'web/navegacion.js')));
   app.get('/retiro.js',(req,res)=>res.sendFile(path.join(__dirname,'web/retiro.js')));
   require('./retiro/rutas.cjs').registrar(app,{limpiarError,env});
   app.post('/api/logo',uploadLogo.single('logo'),async(req,res)=>{
