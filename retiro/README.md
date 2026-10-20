@@ -10,7 +10,7 @@ El formato de tabla reconocido contiene año, edad, prima anual, prima acumulada
 
 Se distinguen efectivo proyectado, protección y aportaciones. El gráfico usa los valores de cada fila. El selector de año controla el ejemplo y la recuperación anticipada. La inflación procede de las etiquetas del documento y no tiene valor por defecto. Las sumas se manejan en centavos enteros.
 
-Las coberturas se identifican mediante filas explícitas: fallecimiento/supervivencia, exención de primas amparada, Seguridad en Vida, Últimos Gastos e incremento No Fumador. La mera mención de Invalidez Sin Espera no acredita contratación ni autoriza convertir protección por fallecimiento en una indemnización de invalidez. Los importes adicionales conservan su carácter referencial y sus condiciones. La vista no muestra una indemnización de invalidez sin datos verificados.
+Las coberturas se identifican mediante filas explícitas: fallecimiento/supervivencia, exención de primas amparada, Seguridad en Vida, Últimos Gastos e incremento No Fumador. Invalidez Sin Espera se identifica cuando su fila incluye suma y aportación; su prima forma parte de la suma de aportaciones contrastada con la prima inicial. La mera mención no acredita contratación. La suma identificada es inicial: no se completa una tabla anual de invalidez con la columna de protección por fallecimiento. También se reconoce el incremento Mujer cuando su fila lo indica. Los importes adicionales conservan su carácter referencial y sus condiciones. La vista no muestra una indemnización de invalidez sin datos verificados.
 
 El valor final de una tabla identificada como proyección se muestra como proyectado. El texto comercial «garantizado» no convierte esa serie en una serie de valores garantizados. El estado sigue siendo `borrador`, con `generacionHabilitada:false`; no existe todavía una ruta de descarga final de Retiro.
 
@@ -30,3 +30,9 @@ Los borradores usan la autenticación existente, permanecen en memoria 30 minuto
 - Verificar la construcción Docker en el entorno de despliegue. La ejecución local no acredita un despliegue en Railway.
 
 No requiere credenciales reales de GNP para leer la ilustración. No se ha desplegado ni cambiado GMM.
+
+## Navegación del portal
+
+El menú separa Inicio, Gastos Médicos y Vida y Retiro. Las herramientas permanecen montadas al cambiar de sección para conservar los formularios y la vista temporal. La URL permite volver directamente a `#gastos-medicos` o `#vida`; los hashes desconocidos muestran Inicio. En móviles, el mismo menú pasa a la parte superior. Se verificaron cambio de sección, conservación de los datos de GMM, navegación atrás y recarga en Vida.
+
+Se validó además una ilustración escaneada de tres páginas y 35 años: sus tres primas de coberturas cuadran y se identifican por separado la exención y la suma inicial de Invalidez Sin Espera. No se guarda el PDF ni datos del cliente en los tests. Para tablas largas, la tercera página muestra dos bloques de años consecutivos sin omitir filas; se verificaron tres páginas sin solapamientos en los cuatro enfoques para esta muestra.
