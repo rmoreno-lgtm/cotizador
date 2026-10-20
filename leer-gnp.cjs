@@ -52,6 +52,32 @@ function validarSolicitud(s) {
   return s;
 }
 
+function aseguradosDelDesglose(desglose, esperados) {
+  const perfil = /Edad:\s*(\d+)\s+Género:\s*([MF])\s+Riesgo:\s*[^\n]*?C\.?P\s*:\s*(\d{5})/gi;
+  const leer = texto => [...texto.matchAll(perfil)].map(m=>({edad:Number(m[1]),genero:m[2].toUpperCase()==='M'?'Masculino':'Femenino',cp:m[3]}));
+  const encontrados=leer(desglose);
+  const etiquetas=[...desglose.matchAll(/(?:^|\n)\s*(Titular|Familiar\s+(\d+))\s*(?=\n|Edad:|$)/gi)];
+  // El orden del texto extraído de columnas puede diferir del orden de los familiares.
+  // Solo reordenar cuando cada persona tiene una etiqueta inequívoca en el documento.
+  if(!etiquetas.length)return encontrados;
+  if(etiquetas.length!==encontrados.length)throw new Error('No se pudo asociar cada asegurado con su etiqueta en el desglose de GNP.');
+  const porNumero=new Map();
+  etiquetas.forEach((etiqueta,i)=>{
+    const numero=etiqueta[2]===undefined?0:Number(etiqueta[2]);
+    if((etiqueta[2]!==undefined && numero===0) || numero>=esperados.length || porNumero.has(numero)) {
+      throw new Error('El desglose de GNP contiene etiquetas de asegurados duplicadas o fuera de la solicitud.');
+    }
+    const bloque=desglose.slice(etiqueta.index+etiqueta[0].length,etiquetas[i+1]?.index);
+    const personas=leer(bloque);
+    if(personas.length!==1)throw new Error('No se pudo identificar un único asegurado para cada etiqueta del desglose de GNP.');
+    porNumero.set(numero,personas[0]);
+  });
+  if(porNumero.size!==esperados.length || esperados.some((_,i)=>!porNumero.has(i))) {
+    throw new Error('Faltan etiquetas de asegurados del desglose de GNP respecto a la solicitud.');
+  }
+  return esperados.map((_,i)=>porNumero.get(i));
+}
+
 function analizarPaginas(paginas, solicitud) {
   validarSolicitud(solicitud);
   const textos = paginas.map(p=>typeof p==='string'?p:p.text);
@@ -84,17 +110,17 @@ function analizarPaginas(paginas, solicitud) {
   mismo(acceso,solicitud.acceso,'acceso hospitalario');
   mismo(tabulador,solicitud.tabulador,'tabulador');
   mismo(deducible,Number(solicitud.deducible)*100,'deducible');
-  const asegurados=[...todo.matchAll(/Edad:\s*(\d+)\s+Género:\s*([MF])\s+Riesgo:\s*[^\n]*?C\.?P\s*:\s*(\d{5})/gi)].map(m=>({edad:Number(m[1]),genero:m[2].toUpperCase()==='M'?'Masculino':'Femenino',cp:m[3]}));
+  const inicioDesglose=textos.findIndex(t=>/Desglose de Cotización/i.test(t));
+  if(inicioDesglose<0) throw new Error('Falta el desglose por asegurado de GNP.');
+  const desglose=textos.slice(inicioDesglose).join('\n').replace(/[\t\u00a0]/g,' ');
   const esperados=[solicitud,...solicitud.familiares];
+  const asegurados=aseguradosDelDesglose(desglose,esperados);
   if(asegurados.length!==esperados.length) throw new Error('El número de asegurados del PDF no coincide con la solicitud o no pudo leerse.');
   asegurados.forEach((a,i)=>{
     mismo(a.edad,esperados[i].edad,`edad del asegurado ${i+1}`);
     mismo(a.genero,esperados[i].genero,`género del asegurado ${i+1}`);
     mismo(a.cp,solicitud.cp,`CP del asegurado ${i+1}`);
   });
-  const inicioDesglose=textos.findIndex(t=>/Desglose de Cotización/i.test(t));
-  if(inicioDesglose<0) throw new Error('Falta el desglose por asegurado de GNP.');
-  const desglose=textos.slice(inicioDesglose).join('\n').replace(/[\t\u00a0]/g,' ');
   const sumarDesglose=(etiqueta,campo)=>{
     const re=new RegExp(etiqueta+'\\s*:\\s*\\$\\s*'+cantidad,'gi');
     const valores=[...desglose.matchAll(re)].map(m=>centavos(m[1]));
