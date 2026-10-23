@@ -9,10 +9,10 @@ function ilustracion(texto){
   campos[k]={valor:String(valores[0]),fuente:matches[0][0].trim()};
  }
  campo('cliente',/(?:A?preciable|Nombre del cliente)\s*:\s*([^\r\n]{2,100})/gi);
- campo('edad',/Edad del solicitante\s*:\s*(\d{1,3})\s*a(?:n|fi|fh|nh|h|ri|f)?os/gi,Number);
+ campo('edad',/Edad del solicitante\s*:\s*(\d{1,3})\s*a(?:n|fi|fh|nh|h|ri|f|ii)?os\b/gi,Number);
  campo('inflacion',/(?:Tasa de )?Inflacion\s*:?\s*(\d{1,2}(?:[.,]\d+)?)\s*%/gi,v=>Number(v.replace(',','.')));
- campo('plazoPago',/Plazo de pago\s*:\s*(\d{1,3})\s*a(?:n|fi|fh|nh|h|ri|f)?os/gi,Number);
- campo('edadVencimiento',/Plazo\s*:\s*Edad\s*(\d{1,3})\s*a(?:n|fi|fh|nh|h|ri|f)?os/gi,Number);
+ campo('plazoPago',/Plazo de pago\s*:\s*(\d{1,3})\s*a(?:n|fi|fh|nh|h|ri|f|ii)?os\b/gi,Number);
+ campo('edadVencimiento',/Plazo\s*:\s*Edad\s*(\d{1,3})\s*a(?:n|fi|fh|nh|h|ri|f|ii)?os\b/gi,Number);
  campo('moneda',/Moneda\s*:\s*_*\s*(Nacional|MXN|USD|UDIS|Dolares)/gi,v=>/Nacional|MXN/i.test(v)?'MXN':v.toUpperCase());
  campo('aportacion',/aportacion de\s*(\$[\d,]+(?:\.\d{2})?)\s*pesos anuales/gi,v=>'$'+(money(v)/100).toLocaleString('en-US'));
  const tabla=[];const importe='(\\$[\\d,]+(?:\\.\\d{2})?)';
