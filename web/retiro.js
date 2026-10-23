@@ -1,10 +1,10 @@
 (()=>{
- const $=id=>document.getElementById(id);let modelo,paginas=3,borrador,datosListos=false,descargando=false,logos={quillum:false,gnp:false};
+ const $=id=>document.getElementById(id);let modelo,titulos={},sugeridos={},enfoqueTitulo,guardandoTitulo=false,paginas=3,borrador,datosListos=false,descargando=false,logos={quillum:false,gnp:false};
  const aviso=t=>{$('retiro-estado').textContent=t;};
  async function json(url,options){const r=await fetch(url,options);if(r.status===401){location.assign('/login');throw Error('Inicia sesión.');}const d=await r.json();if(!r.ok)throw Error(d.error||'No se pudo completar la solicitud.');return d;}
- function actualizarDescarga(){$('retiro-descargar').disabled=!borrador||!datosListos||!logos.quillum||!logos.gnp||descargando;}
+ function actualizarDescarga(){$('retiro-descargar').disabled=!borrador||!datosListos||!logos.quillum||!logos.gnp||descargando||guardandoTitulo;}
  function mostrarLogos(d){logos={quillum:!!d.quillum,gnp:!!d.gnp};$('retiro-logos-estado').textContent='QUILLUM: '+(logos.quillum?'guardado':'pendiente')+' · GNP: '+(logos.gnp?'guardado':'pendiente')+'.';if(!logos.quillum||!logos.gnp)$('retiro-logos').open=true;actualizarDescarga();}
- async function eliminar(){if(borrador){await json('/api/retiro/'+borrador,{method:'DELETE'});borrador=undefined;}datosListos=false;modelo=undefined;$('retiro-explorar').hidden=true;actualizarDescarga();}
+ async function eliminar(){if(borrador){await json('/api/retiro/'+borrador,{method:'DELETE'});borrador=undefined;}datosListos=false;modelo=undefined;$('retiro-explorar').hidden=true;$('retiro-presentacion').hidden=true;titulos={};sugeridos={};enfoqueTitulo=undefined;actualizarDescarga();}
  function parametros(){const q=new URLSearchParams({enfoque:$('retiro-enfoque').value});if(!$('retiro-anio').disabled)q.set('anio',$('retiro-anio').value);return q;}
  function mostrar(){if(!borrador)return;const frame=$('retiro-vista');frame.hidden=false;$('retiro-navegacion').hidden=false;const ancho=Math.max(280,Math.min(2000,frame.clientWidth||818));const q=parametros();q.set('pagina',$('retiro-pagina').value);q.set('ancho',String(ancho));frame.style.height=Math.ceil(1180*Math.min(1,(ancho-24)/794)+32)+'px';frame.src='/api/retiro/'+borrador+'/vista?'+q;}
  function explorar(){
@@ -16,7 +16,18 @@
   const final=f.anio===modelo.tabla.at(-1).anio;
   for(const [titulo,valor]of [['Aportas este año',dinero(f.aportacion)],['Llevas aportado',dinero(f.acumulado)],[final?'Ahorro al vencimiento · proyectado':'Recuperación anticipada · proyectada',dinero(f.efectivo)],['Protección contratada',dinero(f.proteccion)]]){const div=document.createElement('div'),small=document.createElement('small'),b=document.createElement('b');small.textContent=titulo;b.textContent=valor;div.append(small,b);resumen.append(div);}
  }
- for(const id of ['retiro-enfoque','retiro-anio','retiro-pagina'])$(id).addEventListener('change',()=>{explorar();mostrar();});
+ function tituloActual(){enfoqueTitulo=$('retiro-enfoque').value;$('retiro-titulo-personalizado').value=titulos[enfoqueTitulo]||sugeridos[enfoqueTitulo]||'';$('retiro-presentacion').hidden=!borrador;}
+ async function guardarTitulo(){
+  if(!borrador||guardandoTitulo)return;
+  const enfoque=enfoqueTitulo,titulo=$('retiro-titulo-personalizado').value;guardandoTitulo=true;actualizarDescarga();$('retiro-aplicar-titulo').disabled=true;$('retiro-restablecer-titulo').disabled=true;$('retiro-enfoque').disabled=true;$('retiro-titulo-personalizado').disabled=true;
+  try{const d=await json('/api/retiro/'+borrador+'/titulo',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfoque,titulo})});titulos[enfoque]=d.titulo;if(enfoque===enfoqueTitulo&&$('retiro-titulo-personalizado').value===titulo){$('retiro-titulo-personalizado').value=d.titulo;$('retiro-titulo-estado').textContent='Título aplicado. Se incluirá en la propuesta.';}}finally{guardandoTitulo=false;$('retiro-aplicar-titulo').disabled=false;$('retiro-restablecer-titulo').disabled=false;$('retiro-enfoque').disabled=false;$('retiro-titulo-personalizado').disabled=false;actualizarDescarga();}
+ }
+ $('retiro-titulo-personalizado').addEventListener('input',()=>{if(enfoqueTitulo)titulos[enfoqueTitulo]=$('retiro-titulo-personalizado').value;$('retiro-titulo-estado').textContent='Pulsa «Aplicar título» para verlo. También se aplicará antes de descargar.';});
+ $('retiro-titulo-personalizado').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('retiro-aplicar-titulo').click();}});
+ $('retiro-aplicar-titulo').addEventListener('click',async()=>{try{await guardarTitulo();mostrar();}catch(e){$('retiro-titulo-estado').textContent=e.message;}});
+ $('retiro-restablecer-titulo').addEventListener('click',async()=>{titulos[enfoqueTitulo]=sugeridos[enfoqueTitulo];tituloActual();try{await guardarTitulo();mostrar();}catch(e){$('retiro-titulo-estado').textContent=e.message;}});
+ $('retiro-enfoque').addEventListener('change',async()=>{if(!borrador)return;tituloActual();try{await guardarTitulo();mostrar();}catch(e){$('retiro-titulo-estado').textContent=e.message;}});
+ for(const id of ['retiro-anio','retiro-pagina'])$(id).addEventListener('change',()=>{explorar();mostrar();});
  $('retiro-deslizador').addEventListener('input',()=>{$('retiro-anio').value=$('retiro-deslizador').value;explorar();});
  $('retiro-deslizador').addEventListener('change',mostrar);
  let anchoPrevio=0,pendiente;new ResizeObserver(entradas=>{const ancho=Math.round(entradas[0].contentRect.width);if(Math.abs(ancho-anchoPrevio)<8)return;anchoPrevio=ancho;clearTimeout(pendiente);pendiente=setTimeout(()=>{if(borrador)mostrar();},150);}).observe($('retiro-vista').parentElement);
@@ -26,14 +37,14 @@
  });
  $('retiro-descargar').addEventListener('click',async()=>{
   if(!borrador)return;descargando=true;actualizarDescarga();$('retiro-descargar').textContent='Preparando PDF…';aviso('Preparando las '+paginas+' páginas de tu propuesta…');
-  try{const r=await fetch('/api/retiro/'+borrador+'/pdf?'+parametros());if(r.status===401){location.assign('/login');return;}if(!r.ok){const d=await r.json();throw Error(d.error||'No se pudo generar el PDF.');}const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download='Propuesta-QUILLUM-Vida-Retiro.pdf';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);aviso('PDF descargado. Incluye todas las páginas, el enfoque seleccionado y tus logos guardados.');}catch(e){aviso(e.message);}finally{descargando=false;$('retiro-descargar').textContent='Descargar propuesta PDF';actualizarDescarga();}
+  try{await guardarTitulo();mostrar();const r=await fetch('/api/retiro/'+borrador+'/pdf?'+parametros());if(r.status===401){location.assign('/login');return;}if(!r.ok){const d=await r.json();throw Error(d.error||'No se pudo generar el PDF.');}const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download='Propuesta-QUILLUM-Vida-Retiro.pdf';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);aviso('PDF descargado. Incluye todas las páginas, el enfoque seleccionado y tus logos guardados.');}catch(e){aviso(e.message);}finally{descargando=false;$('retiro-descargar').textContent='Descargar propuesta PDF';actualizarDescarga();}
  });
  $('retiro-form').addEventListener('submit',async event=>{
   event.preventDefault();$('retiro-cargar').disabled=true;aviso('Leyendo ilustración…');
   try{
    await eliminar();$('retiro-vista').hidden=true;$('retiro-navegacion').hidden=true;
    const data=await json('/api/retiro/preview',{method:'POST',body:new FormData($('retiro-form'))});
-   borrador=data.id;modelo=data.modelo;paginas=data.paginas||3;datosListos=data.datosListos;mostrarLogos(data.logos);
+   borrador=data.id;modelo=data.modelo;paginas=data.paginas||3;datosListos=data.datosListos;sugeridos=data.titulos||{};titulos={...sugeridos};tituloActual();$('retiro-titulo-estado').textContent='Puedes usar el título sugerido o escribir el tuyo.';mostrarLogos(data.logos);
    const lista=$('retiro-incidencias');lista.replaceChildren();
    for(const texto of data.modelo.incidencias){const li=document.createElement('li');li.textContent=texto;lista.append(li);}
    const evidencias=$('retiro-evidencias');evidencias.replaceChildren();
