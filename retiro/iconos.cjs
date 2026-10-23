@@ -1,5 +1,6 @@
 function icono(simbolo){
  const rutas={
+  'bolsa':'<path d="M17 4h14l-4 9H21ZM17 15c-3 4-12 12-12 21 0 7 7 9 19 9s19-2 19-9c0-9-9-17-12-21ZM16 14h16"/><path d="M29 24c-7-5-16 3-5 6s4 11-5 6M24 20v20"/>',
   '♿':'<circle cx="24" cy="6" r="4"/><path d="M22 13v14h12l7 13 5-3M23 16h9M18 23a13 13 0 1 0 14 19"/>',
   '☀':'<circle cx="24" cy="24" r="9"/><path d="M24 2v7m0 30v7M2 24h7m30 0h7M8 8l5 5m22 22 5 5M8 40l5-5m22-22 5-5"/>',
   '↗':'<path d="M6 39h36M11 34V22h6v12m6 0V16h6v18m6 0V8h6v26M9 15 23 7h-8m8 0-2 8"/>',

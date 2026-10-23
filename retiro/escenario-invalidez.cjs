@@ -11,7 +11,10 @@ function escenarioInvalidez(modelo,ejemplo){
  const bloques=[],pagoFinal=modelo.tablaValida?modelo.tabla.findLast(f=>f.aportacion>0):null;
  const sinPendientes=ejemplo&&pagoFinal&&ejemplo.anio>pagoFinal.anio;
  if(exencion)bloques.push(`<div class="cobertura-invalidez"><span class="icono">${icono('✓')}</span><h4>Exención de primas</h4><p>${sinPendientes?'Para ese momento ya habrías terminado tus aportaciones. No quedarían nuevas aportaciones programadas por exentar.':'Dejas de pagar las primas amparadas por esta cobertura, conforme al dictamen de invalidez y a las condiciones de tu contrato.'}</p></div>`);
- if(invalidez)bloques.push(`<div class="cobertura-invalidez"><span class="icono">${icono('◇')}</span><h4>Invalidez Sin Espera</h4><p>Recibes la indemnización que corresponda a tu cobertura. Tu suma inicial es <b>${dinero(invalidez.suma)}</b>.</p><p>La suma vigente para el ${ejemplo?'año '+ejemplo.anio:'momento de una invalidez'} queda por verificar.</p></div>`);
+ if(invalidez){
+  const anual=modelo.tablaValida&&ejemplo?invalidez.sumasPorAnio?.find(f=>f.anio===ejemplo.anio):undefined;
+  bloques.push(`<div class="cobertura-invalidez"><span class="icono">${icono('◇')}</span><h4>Invalidez Sin Espera</h4>${anual?`<p>Indemnización prevista para el año ${ejemplo.anio}:</p><strong class="suma-invalidez">${dinero(anual.suma)}</strong><p>Importe ilustrado; sujeto a vigencia, dictamen y condiciones de tu cobertura.</p>`:`<p>Recibes la indemnización que corresponda a tu cobertura. Tu suma inicial es <b>${dinero(invalidez.suma)}</b>.</p><p>La suma vigente para el ${ejemplo?'año '+ejemplo.anio:'momento de una invalidez'} queda por verificar.</p>`}</div>`);
+ }
  const ahorro=modelo.tablaValida&&modelo.campos.ahorro?dinero(modelo.campos.ahorro.valor):'Importe por confirmar';
  const tipo=modelo.ahorroTipo==='garantizado'?'garantizado':'proyectado';
  const sinSeguro=invalidez?'La indemnización y la exención son beneficios distintos.': 'Este escenario contempla la exención, sin mostrar una indemnización por seguro de invalidez.';

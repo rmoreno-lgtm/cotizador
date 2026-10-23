@@ -56,12 +56,20 @@ function ilustracion(texto){
   const aportaciones=coberturas.filter(c=>c.aportacion!==undefined).reduce((total,c)=>total+c.aportacion,0);
   if(Math.abs(aportaciones-tabla[0].aportacion)>100)error('Las aportaciones de coberturas identificadas no coinciden con la prima inicial; revisar si falta leer otra cobertura.');
  }
- // No convertir ninguna columna de protección por fallecimiento en suma de invalidez.
+ // La correspondencia Proyecta entre Protección e ISE fue confirmada por el asesor; se aplica solo con sumas iniciales coincidentes y tabla validada.
  if(/Invalidez Sin Espera/i.test(t) && !coberturas.some(c=>c.tipo==='invalidez'))incidencias.push('Se menciona Invalidez Sin Espera: revisar contratación y sumas por año antes de mostrar una indemnización.');
  if(!coberturas.length)incidencias.push('No se identificaron filas completas de coberturas contratadas.');
  const definicion=/Proteccion Contratada\s*:\s*Cantidad que se entregara al final del plazo contratado o antes si ocurre el fallecimiento del Asegurado/i.exec(t);
  fuentes.fallecimiento=definicion?.[0]||null;
  const ultimo=tabla.at(-1);
+ if(tablaValida&&invalidez&&inicial&&invalidez.suma>0){
+  if(invalidez.suma===inicial.suma){
+   invalidez.ambitoSuma='inicial_y_anual';
+   invalidez.sumasPorAnio=tabla.map(f=>({anio:f.anio,suma:f.proteccion,fuente:f.fuente}));
+   invalidez.baseSumas='proteccion_proyecta_correspondencia_confirmada_asesor';
+   fuentes.invalidez='Correspondencia de la columna Protección para Invalidez Sin Espera en Proyecta, confirmada por el asesor; sumas iniciales coincidentes.';
+  }else incidencias.push('La suma inicial de Invalidez Sin Espera difiere de Protección; sus importes anuales requieren revisión.');
+ }
  if(tablaValida){
   campos.plazoPlan={valor:String(vencimiento-edad),fuente:'Diferencia entre edad de vencimiento y edad inicial, contrastada con '+tabla.length+' filas.'};
   campos.proteccionInicial={valor:String(tabla[0].proteccion),fuente:tabla[0].fuente};
