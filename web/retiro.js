@@ -1,10 +1,17 @@
 (()=>{
- const $=id=>document.getElementById(id);let iaDisponible=false,modelo,frases={},generandoTextos=false,titulos={},sugeridos={},enfoqueTitulo,guardandoTitulo=false,paginas=3,borrador,datosListos=false,descargando=false,logos={quillum:false,gnp:false};
+ const $=id=>document.getElementById(id);let archivoPreparado,iaDisponible=false,modelo,frases={},generandoTextos=false,titulos={},sugeridos={},enfoqueTitulo,guardandoTitulo=false,paginas=3,borrador,datosListos=false,descargando=false,logos={quillum:false,gnp:false};
  const aviso=t=>{$('retiro-estado').textContent=t;};
  async function json(url,options){const r=await fetch(url,options);if(r.status===401){location.assign('/login');throw Error('Inicia sesión.');}const d=await r.json();if(!r.ok)throw Error(d.error||'No se pudo completar la solicitud.');return d;}
- function actualizarDescarga(){$('retiro-descargar').disabled=!borrador||!datosListos||!logos.quillum||!logos.gnp||descargando||guardandoTitulo||generandoTextos;}
+ function limpiarArchivo(){if(archivoPreparado)URL.revokeObjectURL(archivoPreparado);archivoPreparado=undefined;$('retiro-descarga-enlace').hidden=true;$('retiro-descarga-enlace').removeAttribute('href');}
+ function actualizarDescarga(){
+  const bloqueada=!borrador||!datosListos||!logos.quillum||!logos.gnp||descargando||guardandoTitulo||generandoTextos;$('retiro-descargar').disabled=bloqueada;
+  const motivo=!borrador?'Carga una ilustración para preparar la propuesta.':!datosListos?'La descarga está pendiente: abre «Datos del PDF y observaciones» y revisa los datos pendientes.':!logos.quillum||!logos.gnp?'Guarda el logo de '+[!logos.quillum?'QUILLUM':'',!logos.gnp?'GNP':''].filter(Boolean).join(' y ')+' para habilitar la descarga.':descargando?'Preparando el archivo PDF completo…':guardandoTitulo?'Aplicando tus textos…':generandoTextos?'Espera a que termine la redacción con IA.':'Lista para descargar la propuesta completa con el enfoque y el año de invalidez elegidos.';
+  $('retiro-descarga-motivo').textContent=motivo;$('retiro-descargar').title=motivo;
+ }
+ function estadoDescarga(texto,error=false){$('retiro-descarga-estado').textContent=texto;$('retiro-descarga-estado').classList.toggle('error',error);}
+
  function mostrarLogos(d){logos={quillum:!!d.quillum,gnp:!!d.gnp};$('retiro-logos-estado').textContent='QUILLUM: '+(logos.quillum?'guardado':'pendiente')+' · GNP: '+(logos.gnp?'guardado':'pendiente')+'.';if(!logos.quillum||!logos.gnp)$('retiro-logos').open=true;actualizarDescarga();}
- async function eliminar(){if(borrador){await json('/api/retiro/'+borrador,{method:'DELETE'});borrador=undefined;}datosListos=false;modelo=undefined;$('retiro-presentacion').hidden=true;titulos={};frases={};sugeridos={};enfoqueTitulo=undefined;$('retiro-anio').disabled=true;explorar();$('retiro-contexto').value='';$('retiro-frase').value='';actualizarDescarga();}
+ async function eliminar(){limpiarArchivo();estadoDescarga('');if(borrador){await json('/api/retiro/'+borrador,{method:'DELETE'});borrador=undefined;}datosListos=false;modelo=undefined;$('retiro-presentacion').hidden=true;titulos={};frases={};sugeridos={};enfoqueTitulo=undefined;$('retiro-anio').disabled=true;explorar();$('retiro-contexto').value='';$('retiro-frase').value='';actualizarDescarga();}
  function parametros(){const q=new URLSearchParams({enfoque:$('retiro-enfoque').value});if(!$('retiro-anio').disabled)q.set('anio',$('retiro-anio').value);return q;}
  function mostrar(){if(!borrador)return;const frame=$('retiro-vista');frame.hidden=false;$('retiro-navegacion').hidden=false;const ancho=Math.max(280,Math.min(2000,frame.clientWidth||818));const q=parametros();q.set('pagina',$('retiro-pagina').value);q.set('ancho',String(ancho));frame.style.height=Math.ceil(1180*Math.min(1,(ancho-24)/794)+32)+'px';frame.src='/api/retiro/'+borrador+'/vista?'+q;}
  function explorar(){
@@ -14,31 +21,39 @@
  function tituloActual(){enfoqueTitulo=$('retiro-enfoque').value;$('retiro-titulo-personalizado').value=titulos[enfoqueTitulo]||sugeridos[enfoqueTitulo]||'';$('retiro-frase').value=frases[enfoqueTitulo]||'';$('retiro-presentacion').hidden=!borrador;}
  async function guardarTitulo(){
   if(!borrador||guardandoTitulo)return;
+  if(!descargando){limpiarArchivo();estadoDescarga('');}
   const enfoque=enfoqueTitulo,titulo=$('retiro-titulo-personalizado').value,frase=$('retiro-frase').value;guardandoTitulo=true;actualizarDescarga();$('retiro-aplicar-titulo').disabled=true;$('retiro-restablecer-titulo').disabled=true;$('retiro-enfoque').disabled=true;$('retiro-titulo-personalizado').disabled=true;$('retiro-frase').disabled=true;$('retiro-sugerir-textos').disabled=true;
   try{const d=await json('/api/retiro/'+borrador+'/titulo',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfoque,titulo,frase})});titulos[enfoque]=d.titulo;frases[enfoque]=d.frase||'';if(enfoque===enfoqueTitulo&&$('retiro-titulo-personalizado').value===titulo){$('retiro-titulo-personalizado').value=d.titulo;$('retiro-frase').value=d.frase||'';$('retiro-titulo-estado').textContent='Textos aplicados. Se incluirán en la propuesta.';}}finally{guardandoTitulo=false;$('retiro-aplicar-titulo').disabled=false;$('retiro-restablecer-titulo').disabled=false;$('retiro-enfoque').disabled=false;$('retiro-titulo-personalizado').disabled=false;$('retiro-frase').disabled=false;$('retiro-sugerir-textos').disabled=generandoTextos||!iaDisponible;actualizarDescarga();}
  }
- $('retiro-titulo-personalizado').addEventListener('input',()=>{if(enfoqueTitulo)titulos[enfoqueTitulo]=$('retiro-titulo-personalizado').value;$('retiro-titulo-estado').textContent='Pulsa «Aplicar textos» para verlos. También se aplicará antes de descargar.';});
+ $('retiro-titulo-personalizado').addEventListener('input',()=>{limpiarArchivo();estadoDescarga('');if(enfoqueTitulo)titulos[enfoqueTitulo]=$('retiro-titulo-personalizado').value;$('retiro-titulo-estado').textContent='Pulsa «Aplicar textos» para verlos. También se aplicará antes de descargar.';});
  $('retiro-sugerir-textos').addEventListener('click',async()=>{
   if(!borrador||!iaDisponible||generandoTextos||guardandoTitulo)return;
-  generandoTextos=true;actualizarDescarga();const controles=['retiro-sugerir-textos','retiro-contexto','retiro-titulo-personalizado','retiro-frase','retiro-enfoque','retiro-aplicar-titulo','retiro-restablecer-titulo','retiro-cargar','retiro-cerrar'];for(const id of controles)$(id).disabled=true;
+  limpiarArchivo();estadoDescarga('');generandoTextos=true;actualizarDescarga();const controles=['retiro-sugerir-textos','retiro-contexto','retiro-titulo-personalizado','retiro-frase','retiro-enfoque','retiro-aplicar-titulo','retiro-restablecer-titulo','retiro-cargar','retiro-cerrar'];for(const id of controles)$(id).disabled=true;
   $('retiro-contexto-estado').textContent='Redactando con IA…';
   try{const d=await json('/api/retiro/'+borrador+'/sugerir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enfoque:enfoqueTitulo,contexto:$('retiro-contexto').value})});titulos[enfoqueTitulo]=d.titulo;frases[enfoqueTitulo]=d.frase;tituloActual();$('retiro-contexto-estado').textContent='Sugerencia generada. Revisa el título y la frase de cierre; pulsa «Aplicar textos» para verlos en la propuesta.';$('retiro-titulo-estado').textContent='Textos sugeridos pendientes de aplicar.';}catch(e){$('retiro-contexto-estado').textContent=e.message;}finally{generandoTextos=false;for(const id of controles)$(id).disabled=false;actualizarDescarga();}
  });
- $('retiro-frase').addEventListener('input',()=>{if(enfoqueTitulo)frases[enfoqueTitulo]=$('retiro-frase').value;$('retiro-titulo-estado').textContent='Pulsa «Aplicar textos» para verlos. También se aplicarán antes de descargar.';});
+ $('retiro-frase').addEventListener('input',()=>{limpiarArchivo();estadoDescarga('');if(enfoqueTitulo)frases[enfoqueTitulo]=$('retiro-frase').value;$('retiro-titulo-estado').textContent='Pulsa «Aplicar textos» para verlos. También se aplicarán antes de descargar.';});
  $('retiro-titulo-personalizado').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();$('retiro-aplicar-titulo').click();}});
  $('retiro-aplicar-titulo').addEventListener('click',async()=>{try{await guardarTitulo();mostrar();}catch(e){$('retiro-titulo-estado').textContent=e.message;}});
  $('retiro-restablecer-titulo').addEventListener('click',async()=>{titulos[enfoqueTitulo]=sugeridos[enfoqueTitulo];frases[enfoqueTitulo]='';tituloActual();try{await guardarTitulo();mostrar();}catch(e){$('retiro-titulo-estado').textContent=e.message;}});
  $('retiro-enfoque').addEventListener('change',async()=>{if(!borrador)return;tituloActual();try{await guardarTitulo();mostrar();}catch(e){$('retiro-titulo-estado').textContent=e.message;}});
- $('retiro-anio').addEventListener('change',()=>{$('retiro-pagina').value='2';explorar();mostrar();});
+ $('retiro-anio').addEventListener('change',()=>{limpiarArchivo();estadoDescarga('');$('retiro-pagina').value='2';explorar();mostrar();});
  $('retiro-pagina').addEventListener('change',()=>{explorar();mostrar();});
  let anchoPrevio=0,pendiente;new ResizeObserver(entradas=>{const ancho=Math.round(entradas[0].contentRect.width);if(Math.abs(ancho-anchoPrevio)<8)return;anchoPrevio=ancho;clearTimeout(pendiente);pendiente=setTimeout(()=>{if(borrador)mostrar();},150);}).observe($('retiro-vista').parentElement);
  $('retiro-logos-form').addEventListener('submit',async event=>{
   event.preventDefault();$('retiro-guardar-logos').disabled=true;
-  try{const datos=new FormData($('retiro-logos-form'));const d=await json('/api/retiro/logos',{method:'POST',body:datos});mostrarLogos(d);$('retiro-logos-form').reset();if(logos.quillum&&logos.gnp)$('retiro-logos').open=false;mostrar();}catch(e){$('retiro-logos-estado').textContent=e.message;}finally{$('retiro-guardar-logos').disabled=false;}
+  try{const datos=new FormData($('retiro-logos-form'));const d=await json('/api/retiro/logos',{method:'POST',body:datos});limpiarArchivo();estadoDescarga('');mostrarLogos(d);$('retiro-logos-form').reset();if(logos.quillum&&logos.gnp)$('retiro-logos').open=false;mostrar();}catch(e){$('retiro-logos-estado').textContent=e.message;}finally{$('retiro-guardar-logos').disabled=false;}
  });
  $('retiro-descargar').addEventListener('click',async()=>{
-  if(!borrador)return;descargando=true;actualizarDescarga();$('retiro-descargar').textContent='Preparando PDF…';aviso('Preparando las '+paginas+' páginas de tu propuesta…');
-  try{await guardarTitulo();mostrar();const r=await fetch('/api/retiro/'+borrador+'/pdf?'+parametros());if(r.status===401){location.assign('/login');return;}if(!r.ok){const d=await r.json();throw Error(d.error||'No se pudo generar el PDF.');}const url=URL.createObjectURL(await r.blob());const a=document.createElement('a');a.href=url;a.download='Propuesta-QUILLUM-Vida-Retiro.pdf';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);aviso('PDF descargado. Incluye todas las páginas, el enfoque seleccionado y tus logos guardados.');}catch(e){aviso(e.message);}finally{descargando=false;$('retiro-descargar').textContent='Descargar propuesta PDF';actualizarDescarga();}
+  if(!borrador||descargando||guardandoTitulo||generandoTextos)return;
+  const id=borrador;limpiarArchivo();descargando=true;actualizarDescarga();$('retiro-descargar').textContent='Preparando PDF…';estadoDescarga('Preparando las '+paginas+' páginas de tu propuesta…');
+  try{
+   await guardarTitulo();if(borrador!==id)return;mostrar();const r=await fetch('/api/retiro/'+id+'/pdf?'+parametros());if(r.status===401){location.assign('/login');return;}
+   if(!r.ok){let mensaje='No se pudo generar el PDF. Intenta de nuevo en unos momentos.';if(r.headers.get('Content-Type')?.includes('application/json')){const d=await r.json();mensaje=d.error||mensaje;}throw Error(mensaje);}
+   if(!r.headers.get('Content-Type')?.includes('application/pdf'))throw Error('El servidor no devolvió un archivo PDF. Intenta de nuevo.');
+   const archivo=await r.blob();if(!archivo.size||await archivo.slice(0,5).text()!=='%PDF-')throw Error('El archivo recibido no es un PDF válido. Intenta de nuevo.');if(borrador!==id)return;
+   archivoPreparado=URL.createObjectURL(archivo);const a=$('retiro-descarga-enlace');a.href=archivoPreparado;a.hidden=false;a.click();estadoDescarga('PDF listo. Si no comenzó la descarga, pulsa «Guardar PDF preparado». Incluye todas las páginas.');
+  }catch(e){if(borrador===id)estadoDescarga(e.message,true);}finally{descargando=false;$('retiro-descargar').textContent='Descargar propuesta PDF';actualizarDescarga();}
  });
  $('retiro-form').addEventListener('submit',async event=>{
   event.preventDefault();$('retiro-cargar').disabled=true;aviso('Leyendo ilustración…');
