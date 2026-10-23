@@ -1,5 +1,6 @@
 function icono(simbolo){
  const rutas={
+  '♿':'<circle cx="24" cy="6" r="4"/><path d="M22 13v14h12l7 13 5-3M23 16h9M18 23a13 13 0 1 0 14 19"/>',
   '☀':'<circle cx="24" cy="24" r="9"/><path d="M24 2v7m0 30v7M2 24h7m30 0h7M8 8l5 5m22 22 5 5M8 40l5-5m22-22 5-5"/>',
   '↗':'<path d="M6 39h36M11 34V22h6v12m6 0V16h6v18m6 0V8h6v26M9 15 23 7h-8m8 0-2 8"/>',
   '♡':'<path d="M24 40 7 24C-3 13 13 1 24 14 35 1 51 13 41 24Z"/>',
