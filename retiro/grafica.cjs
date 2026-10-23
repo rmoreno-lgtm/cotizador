@@ -7,7 +7,7 @@ function grafica(filas){
  const puntos=k=>[[0,0],...filas.map(f=>[f.anio,f[k]])].map(([a,v])=>x(a).toFixed(1)+','+y(v).toFixed(1)).join(' ');
  const xp=pago?x(pago.anio):null;
  const etiquetaPago=xp===null?null:Math.max(140,Math.min(540,xp));
- return `<svg viewBox="0 0 700 180" role="img" aria-label="Aportaciones acumuladas y valor en efectivo proyectado según tabla GNP"><path d="M18 14H44" stroke="#f36a0b" stroke-width="3" stroke-dasharray="6 4"/><text x="52" y="18" font-size="13" fill="#496079">Total aportado: ${dinero(final.acumulado)}</text><path d="M370 14H396" stroke="#082e53" stroke-width="3"/><text x="404" y="18" font-size="13" fill="#496079">Valor en efectivo proyectado</text>
+ return `<svg viewBox="0 0 700 180" role="img" aria-label="Aportaciones acumuladas y valor en efectivo proyectado a lo largo de tu plan"><path d="M18 14H44" stroke="#f36a0b" stroke-width="3" stroke-dasharray="6 4"/><text x="52" y="18" font-size="13" fill="#496079">Total aportado: ${dinero(final.acumulado)}</text><path d="M370 14H396" stroke="#082e53" stroke-width="3"/><text x="404" y="18" font-size="13" fill="#496079">Valor en efectivo proyectado</text>
  <text x="676" y="39" text-anchor="end" font-size="15" font-weight="bold" fill="#082e53">${dinero(final.efectivo)} al vencimiento</text>
  <path d="M64 48V141H680" fill="none" stroke="#a7b9c9"/><text x="53" y="145" text-anchor="end" font-size="12" fill="#496079">$0</text>
  <polyline points="${puntos('acumulado')}" fill="none" stroke="#f36a0b" stroke-width="3" stroke-dasharray="7 4"/><polyline points="${puntos('efectivo')}" fill="none" stroke="#082e53" stroke-width="3"/>

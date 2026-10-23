@@ -3,10 +3,10 @@ const crypto=require('node:crypto');
 const {ilustracion}=require('./ilustracion.cjs');
 const {ocr}=require('./ocr.cjs');
 const ENFOQUES={
- retiro:{nombre:'Retiro personal',titulo:'Proteges hoy.',subtitulo:'Construyes tu retiro.',texto:'Un patrimonio para disfrutar tu futuro con tranquilidad.',icono:'☀'},
- independencia:{nombre:'Independencia',titulo:'Decides hoy.',subtitulo:'Construyes tu independencia.',texto:'Un plan para ampliar tus posibilidades y elegir tu camino.',icono:'↗'},
- personas:{nombre:'Personas importantes',titulo:'Piensas en ellos.',subtitulo:'Construyes su futuro.',texto:'Una meta que nace de las personas que más te importan.',icono:'♡'},
- patrimonio:{nombre:'Patrimonio',titulo:'Planeas hoy.',subtitulo:'Construyes tu patrimonio.',texto:'Una estrategia para dar forma a tus objetivos de largo plazo.',icono:'◇'}
+ retiro:{nombre:'Retiro personal',titulo:'Tu plan de retiro.',subtitulo:'Ahorro y protección para tu futuro.',texto:'Un patrimonio para disfrutar tu futuro con tranquilidad.',icono:'☀'},
+ independencia:{nombre:'Independencia',titulo:'Tu plan de independencia.',subtitulo:'Ahorro y protección para tus decisiones.',texto:'Un plan para ampliar tus posibilidades y elegir tu camino.',icono:'↗'},
+ personas:{nombre:'Personas importantes',titulo:'Un plan para quienes quieres.',subtitulo:'Ahorro y protección para sus proyectos.',texto:'Una meta que nace de las personas que más te importan.',icono:'♡'},
+ patrimonio:{nombre:'Patrimonio',titulo:'Tu plan patrimonial.',subtitulo:'Ahorro y protección para tus objetivos.',texto:'Una estrategia para dar forma a tus objetivos de largo plazo.',icono:'◇'}
 };
 function analizar(texto) {
  if(typeof texto!=='string' || texto.length>1500000)throw Error('El documento excede el límite de lectura.');
