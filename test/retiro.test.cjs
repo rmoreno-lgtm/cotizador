@@ -8,7 +8,7 @@ test('Retiro lee solo etiquetas explícitas, conserva evidencia y no fija inflac
 });
 test('Retiro no asigna protección por fallecimiento a invalidez ni infiere contratación por una mención',()=>{
  const m=analizar('Proyecta GNP\nProtección por fallecimiento: $3,000,000.00\nInvalidez Sin Espera no contratada\nExención de primas no contratada');
- assert.deepEqual(m.campos,{});assert.match(vista(m),/pendiente de contrastar/);assert.equal(m.generacionHabilitada,false);
+ assert.deepEqual(m.campos,{});assert.match(vista(m),/se confirmarán conforme a las condiciones de tu contrato/);assert.equal(m.generacionHabilitada,false);
 });
 test('Retiro señala contradicciones, plazos inválidos y documentos ajenos',()=>{
  const m=analizar(texto+'\nInflación: 5%');assert.equal(m.campos.inflacion,undefined);assert.ok(m.incidencias.some(i=>i.includes('contradictorios: inflacion')));
@@ -16,7 +16,7 @@ test('Retiro señala contradicciones, plazos inválidos y documentos ajenos',()=
  assert.throws(()=>analizar('Personaliza GNP'),/Proyecta/);
 });
 test('Retiro ofrece cuatro enfoques, tres páginas y escapa datos del PDF',()=>{
- const m=analizar(texto.replace('Cliente de prueba','<script>alert(1)</script>'));
+ const m=analizar(texto.replace('Cliente de prueba','<script>alert(1)</script>'));m.coberturas=[{tipo:'exencion'}];
  for(const [k,e]of Object.entries(ENFOQUES)){const html=vista(m,k);assert.match(html,new RegExp(e.subtitulo.replace('.','\\.')));assert.equal((html.match(/<section class="hoja/g)||[]).length,3);assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);}
  assert.throws(()=>vista(m,'otro'),/Enfoque/);
 });

@@ -146,3 +146,5 @@ La propuesta guía al cliente por su objetivo, escenarios y una tabla anual cont
 La vista previa permite recorrer los años con un control y botones para los hitos; el año elegido actualiza los escenarios y se destaca al exportar. Se conservan los logos guardados. Los datos personales y los PDFs de ejemplo no se incorporan al repositorio.
 
 En la tabla, solo el número del último año de aportación se subraya. La columna de aportación sustituye los ceros posteriores por una línea punteada con la etiqueta «Dejas de aportar», sin modificar los importes del modelo. Los importes finales de efectivo y protección se remarcan; la gráfica inicial ocupa todo el ancho y etiqueta el total aportado, el fin de aportaciones y el valor proyectado al vencimiento.
+
+Los textos dirigidos al prospecto no mencionan el PDF ni el proceso de lectura. El total aportado explica su periodo y los escenarios se personalizan con nombre, año y edad, sin cambiar importes ni condiciones. Los títulos de cada enfoque son descriptivos. La revisión de los datos de origen permanece disponible para el asesor antes de exportar.

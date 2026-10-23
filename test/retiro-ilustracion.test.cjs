@@ -17,7 +17,7 @@ Prima Anual Acumulada Valor en Efectivo Proyectado
 Proteccion Contratada:Cantidad que se entregara al final del plazo contratado o antes si ocurre el fallecimiento del Asegurado`;
 test('Ilustración separa efectivo proyectado, primas, protección y exención; muestra solo coberturas identificadas',()=>{
  const m=analizar(texto);assert.equal(m.tablaValida,true);assert.equal(m.tabla.length,3);assert.equal(m.campos.inflacion.valor,'3.7');assert.equal(m.campos.ahorro.valor,'30000');assert.equal(m.ahorroTipo,'proyectado');assert.equal(m.coberturas.find(c=>c.tipo==='exencion').aportacion,1000);assert.equal(m.generacionHabilitada,false);
- const html=vista(m,'retiro',{},2);assert.match(html,/data-anio="2"/);assert.match(html,/\$150/);assert.match(html,/año 2 · 41 años/);assert.match(html,/Exención de primas/);assert.doesNotMatch(html,/Invalidez Sin Espera/);assert.match(html,/\$300/);assert.match(html,/Valor proyectado/);assert.match(html,/<polyline/);
+ const html=vista(m,'retiro',{},2);assert.match(html,/data-anio="2"/);assert.match(html,/\$150/);assert.match(html,/Persona de prueba, si en el año 2, a tus 41 años,/);assert.match(html,/Exención de primas/);assert.doesNotMatch(html,/Invalidez Sin Espera/);assert.match(html,/\$300/);assert.match(html,/Valor proyectado/);assert.match(html,/<polyline/);
 });
 test('Ilustración rechaza tabla incompleta, duplicada, con acumulado incoherente o años incongruentes',()=>{
  for(const t of [texto.replace('2 41 $103.70 $203.70 $150 74% $1,037\n',''),texto.replace('3 42','2 42'),texto.replace('$203.70 $150','$500 $150'),texto.replace('3 42','3 43')]){
