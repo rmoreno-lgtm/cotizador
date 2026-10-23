@@ -3,6 +3,7 @@ const multer=require('multer');
 const {leer,ENFOQUES}=require('./modelo.cjs');
 const {vista}=require('./vista.cjs');
 const {paginas}=require('./recorrido.cjs');
+const {sugerencias,sugerido,validarTitulo}=require('./titulos.cjs');
 const {almacenLogos}=require('./logos.cjs');
 const {generarPdf,camposFaltantes}=require('./pdf.cjs');
 function registrar(app,{limpiarError,env,base}){
@@ -19,35 +20,40 @@ function registrar(app,{limpiarError,env,base}){
  app.post('/api/retiro/preview',upload,async(req,res)=>{
   limpiar();if(leyendo)return res.status(429).json({error:'Hay una ilustración en lectura. Intenta de nuevo en unos momentos.'});
   if(borradores.size>=5)return res.status(429).json({error:'Cierra un borrador antes de cargar otra ilustración.'});
-  const enfoque=req.body.enfoque||'retiro';if(!ENFOQUES[enfoque])return res.status(400).json({error:'Enfoque inválido.'});
+  const enfoque=req.body.enfoque||'retiro';if(typeof enfoque!=='string'||!Object.hasOwn(ENFOQUES,enfoque))return res.status(400).json({error:'Enfoque inválido.'});
   leyendo=true;
   try{
    const modelo=await leer(req.files?.pdf?.[0]?.buffer);
    const nuevos={quillum:req.files?.quillum?.[0]?.buffer,gnp:req.files?.gnp?.[0]?.buffer};
    const logos=nuevos.quillum||nuevos.gnp?await almacen.guardar(nuevos):await almacen.leer();
-   const id=crypto.randomUUID();borradores.set(id,{modelo,expira:Date.now()+30*60*1000});
-   res.status(201).json({id,modelo,enfoque,logos:estado(logos),paginas:paginas(modelo),datosListos:modelo.tablaValida&&camposFaltantes(modelo).length===0});
+   const id=crypto.randomUUID();borradores.set(id,{modelo,titulos:{},expira:Date.now()+30*60*1000});
+   res.status(201).json({id,modelo,enfoque,titulos:sugerencias(modelo),logos:estado(logos),paginas:paginas(modelo),datosListos:modelo.tablaValida&&camposFaltantes(modelo).length===0});
   }catch(e){res.status(400).json({error:limpiarError(e,env)});}finally{leyendo=false;}
  });
  function seleccion(req,res){
   limpiar();const b=borradores.get(req.params.id);if(!b){res.status(404).json({error:'La vista previa expiró. Vuelve a cargar la ilustración.'});return;}
-  const enfoque=req.query.enfoque||'retiro';if(!ENFOQUES[enfoque]){res.status(400).json({error:'Enfoque inválido.'});return;}
+  const enfoque=req.query.enfoque||'retiro';if(typeof enfoque!=='string'||!Object.hasOwn(ENFOQUES,enfoque)){res.status(400).json({error:'Enfoque inválido.'});return;}
   const anio=req.query.anio===undefined?undefined:Number(req.query.anio);
   if(anio!==undefined&&(!Number.isSafeInteger(anio)||!b.modelo.tablaValida||!b.modelo.tabla.some(f=>f.anio===anio))){res.status(400).json({error:'Año de ejemplo inválido.'});return;}
-  return {modelo:b.modelo,enfoque,anio};
+  return {modelo:b.modelo,enfoque,anio,titulo:b.titulos[enfoque]||sugerido(b.modelo,enfoque)};
  }
+ app.patch('/api/retiro/:id/titulo',(req,res)=>{
+  limpiar();const b=borradores.get(req.params.id);if(!b)return res.status(404).json({error:'La vista previa expiró. Vuelve a cargar la ilustración.'});
+  const enfoque=req.body?.enfoque;if(typeof enfoque!=='string'||!Object.hasOwn(ENFOQUES,enfoque))return res.status(400).json({error:'Enfoque inválido.'});
+  try{const titulo=validarTitulo(req.body.titulo);if(titulo)b.titulos[enfoque]=titulo;else delete b.titulos[enfoque];res.json({titulo:b.titulos[enfoque]||sugerido(b.modelo,enfoque)});}catch(e){res.status(400).json({error:e.message});}
+ });
  app.get('/api/retiro/:id/vista',async(req,res)=>{
   const s=seleccion(req,res);if(!s)return;
   const pagina=req.query.pagina===undefined?undefined:Number(req.query.pagina),ancho=req.query.ancho===undefined?818:Number(req.query.ancho);
   if((pagina!==undefined&&(!Number.isInteger(pagina)||pagina<1||pagina>paginas(s.modelo)))||!Number.isFinite(ancho)||ancho<280||ancho>2000)return res.status(400).json({error:'Vista previa inválida.'});
-  try{const logos=await almacen.leer();res.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox");res.type('html').send(vista(s.modelo,s.enfoque,logos,s.anio,{pagina,ancho}));}catch{res.status(500).send('No se pudo abrir la vista previa. Revisa los logos guardados.');}
+  try{const logos=await almacen.leer();res.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox");res.type('html').send(vista(s.modelo,s.enfoque,logos,s.anio,{pagina,ancho,titulo:s.titulo}));}catch{res.status(500).send('No se pudo abrir la vista previa. Revisa los logos guardados.');}
  });
  app.get('/api/retiro/:id/pdf',async(req,res)=>{
   const s=seleccion(req,res);if(!s)return;
   if(exportando)return res.status(429).json({error:'Se está preparando otro PDF. Intenta de nuevo en unos momentos.'});
   exportando=true;
   try{
-   const pdf=await generarPdf(s.modelo,s.enfoque,await almacen.leer(),s.anio,env);
+   const pdf=await generarPdf(s.modelo,s.enfoque,await almacen.leer(),s.anio,env,{titulo:s.titulo});
    res.set({'Content-Type':'application/pdf','Content-Disposition':'attachment; filename="Propuesta-QUILLUM-Vida-Retiro.pdf"'}).send(pdf);
   }catch(e){res.status(422).json({error:limpiarError(e,env)});}finally{exportando=false;}
  });

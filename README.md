@@ -148,3 +148,9 @@ La vista previa permite recorrer los años con un control y botones para los hit
 En la tabla, solo el número del último año de aportación se subraya. La columna de aportación sustituye los ceros posteriores por una línea punteada con la etiqueta «Dejas de aportar», sin modificar los importes del modelo. Los importes finales de efectivo y protección se remarcan; la gráfica inicial ocupa todo el ancho y etiqueta el total aportado, el fin de aportaciones y el valor proyectado al vencimiento.
 
 Los textos dirigidos al prospecto no mencionan el PDF ni el proceso de lectura. El total aportado explica su periodo y los escenarios se personalizan con nombre, año y edad, sin cambiar importes ni condiciones. Los títulos de cada enfoque son descriptivos. La revisión de los datos de origen permanece disponible para el asesor antes de exportar.
+
+### Títulos personalizados de Retiro
+
+Cada enfoque sugiere una frase con el primer nombre del cliente. Después de cargar la ilustración, el asesor puede editar el «Título para este enfoque» (hasta 140 caracteres), aplicarlo a la vista previa o restablecer la sugerencia. Se conserva un título por enfoque durante el borrador y se aplica también antes de descargar, para que el archivo incluya el texto elegido. Los títulos no pasan a otras propuestas ni se guardan como historial del cliente.
+
+La API autenticada `PATCH /api/retiro/:id/titulo` acepta `{enfoque, titulo}`; un título vacío recupera la sugerencia. Valida texto y longitud, y la presentación escapa HTML. El texto personalizado se guarda en el borrador, sin enviarse en las direcciones de la vista previa ni de la descarga.
