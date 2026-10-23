@@ -13,7 +13,7 @@ async function generarPdf(modelo,enfoque,logos,anio,env){
    const limite=p.querySelector('footer').getBoundingClientRect().top;
    return [...p.children].filter(e=>e.tagName!=='FOOTER').some(e=>e.getBoundingClientRect().bottom>limite-3);
   }));
-  if(invade)throw Error('El contenido excede las tres páginas. Revisa la ilustración antes de descargar.');
+  if(invade)throw Error('El contenido excede el espacio de una página. Revisa la ilustración antes de descargar.');
   return await page.pdf({format:'A4',preferCSSPageSize:true,printBackground:true});
  }finally{await browser.close();}
 }

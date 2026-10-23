@@ -17,7 +17,7 @@ test('Retiro señala contradicciones, plazos inválidos y documentos ajenos',()=
 });
 test('Retiro ofrece cuatro enfoques, tres páginas y escapa datos del PDF',()=>{
  const m=analizar(texto.replace('Cliente de prueba','<script>alert(1)</script>'));
- for(const [k,e]of Object.entries(ENFOQUES)){const html=vista(m,k);assert.match(html,new RegExp(e.subtitulo.replace('.','\\.')));assert.equal((html.match(/class="hoja"/g)||[]).length,3);assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);}
+ for(const [k,e]of Object.entries(ENFOQUES)){const html=vista(m,k);assert.match(html,new RegExp(e.subtitulo.replace('.','\\.')));assert.equal((html.match(/<section class="hoja/g)||[]).length,3);assert.doesNotMatch(html,/<script>/);assert.match(html,/&lt;script&gt;/);}
  assert.throws(()=>vista(m,'otro'),/Enfoque/);
 });
 test('Retiro protege la carga y la vista previa y valida archivos y enfoques',async()=>{

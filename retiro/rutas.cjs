@@ -2,6 +2,7 @@ const crypto=require('node:crypto');
 const multer=require('multer');
 const {leer,ENFOQUES}=require('./modelo.cjs');
 const {vista}=require('./vista.cjs');
+const {paginas}=require('./recorrido.cjs');
 const {almacenLogos}=require('./logos.cjs');
 const {generarPdf,camposFaltantes}=require('./pdf.cjs');
 function registrar(app,{limpiarError,env,base}){
@@ -25,7 +26,7 @@ function registrar(app,{limpiarError,env,base}){
    const nuevos={quillum:req.files?.quillum?.[0]?.buffer,gnp:req.files?.gnp?.[0]?.buffer};
    const logos=nuevos.quillum||nuevos.gnp?await almacen.guardar(nuevos):await almacen.leer();
    const id=crypto.randomUUID();borradores.set(id,{modelo,expira:Date.now()+30*60*1000});
-   res.status(201).json({id,modelo,enfoque,logos:estado(logos),datosListos:modelo.tablaValida&&camposFaltantes(modelo).length===0});
+   res.status(201).json({id,modelo,enfoque,logos:estado(logos),paginas:paginas(modelo),datosListos:modelo.tablaValida&&camposFaltantes(modelo).length===0});
   }catch(e){res.status(400).json({error:limpiarError(e,env)});}finally{leyendo=false;}
  });
  function seleccion(req,res){
@@ -38,7 +39,7 @@ function registrar(app,{limpiarError,env,base}){
  app.get('/api/retiro/:id/vista',async(req,res)=>{
   const s=seleccion(req,res);if(!s)return;
   const pagina=req.query.pagina===undefined?undefined:Number(req.query.pagina),ancho=req.query.ancho===undefined?818:Number(req.query.ancho);
-  if((pagina!==undefined&&(!Number.isInteger(pagina)||pagina<1||pagina>3))||!Number.isFinite(ancho)||ancho<280||ancho>2000)return res.status(400).json({error:'Vista previa inválida.'});
+  if((pagina!==undefined&&(!Number.isInteger(pagina)||pagina<1||pagina>paginas(s.modelo)))||!Number.isFinite(ancho)||ancho<280||ancho>2000)return res.status(400).json({error:'Vista previa inválida.'});
   try{const logos=await almacen.leer();res.set('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; sandbox");res.type('html').send(vista(s.modelo,s.enfoque,logos,s.anio,{pagina,ancho}));}catch{res.status(500).send('No se pudo abrir la vista previa. Revisa los logos guardados.');}
  });
  app.get('/api/retiro/:id/pdf',async(req,res)=>{
