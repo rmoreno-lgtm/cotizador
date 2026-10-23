@@ -54,3 +54,12 @@ test('La vista conserva los 35 años en una sola tabla continua',()=>{
  const m=analizar(cabecera+'Prima Anual Acumulada Valor en Efectivo Proyectado\n'+filas);assert.equal(m.tablaValida,true);assert.equal(m.tabla.length,35);
  const html=vista(m);assert.doesNotMatch(html,/tablas-anuales/);assert.equal((html.match(/<table /g)||[]).length,1);assert.equal((html.match(/data-anio=/g)||[]).length,35);assert.match(html,/<b>35<\/b><\/td><td>59<\/td>/);assert.match(html,/Última aportación/);assert.match(html,/aportación \$0/);
 });
+
+test('OCR aiios conserva los números y valida el vencimiento contra toda la tabla',()=>{
+ const original=analizar(texto);
+ for(const t of [texto.replace('43 anos','43 aiios'),texto.replaceAll(' anos',' aiios')]){
+  const m=analizar(t);assert.equal(m.tablaValida,true);assert.equal(m.campos.edadVencimiento.valor,'43');assert.equal(m.campos.plazoPlan.valor,'3');assert.equal(m.campos.ahorro.valor,original.campos.ahorro.valor);assert.deepEqual(m.tabla,original.tabla);assert.match(m.campos.edadVencimiento.fuente,/43 aiios/);
+ }
+ const contradictorio=analizar(texto.replace('43 anos','43 aiios')+'\nPlazo: Edad 44 aiios');assert.equal(contradictorio.tablaValida,false);assert.equal(contradictorio.campos.edadVencimiento,undefined);assert.equal(contradictorio.campos.ahorro,undefined);
+ const distinto=analizar(texto.replace('43 anos','44 aiios'));assert.equal(distinto.campos.edadVencimiento.valor,'44');assert.equal(distinto.tablaValida,false);assert.equal(distinto.campos.ahorro,undefined);
+});
