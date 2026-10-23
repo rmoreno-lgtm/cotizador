@@ -63,3 +63,20 @@ test('OCR aiios conserva los números y valida el vencimiento contra toda la tab
  const contradictorio=analizar(texto.replace('43 anos','43 aiios')+'\nPlazo: Edad 44 aiios');assert.equal(contradictorio.tablaValida,false);assert.equal(contradictorio.campos.edadVencimiento,undefined);assert.equal(contradictorio.campos.ahorro,undefined);
  const distinto=analizar(texto.replace('43 anos','44 aiios'));assert.equal(distinto.campos.edadVencimiento.valor,'44');assert.equal(distinto.tablaValida,false);assert.equal(distinto.campos.ahorro,undefined);
 });
+
+test('El año de invalidez cambia solo su historia, sin modificar tabla, fallecimiento ni importes',()=>{
+ const m=analizar(texto),antes=JSON.stringify(m);
+ const uno=vista(m,'retiro',{},1),dos=vista(m,'retiro',{},3);
+ const tabla=html=>html.match(/<table\b[\s\S]*?<\/table>/)[0];
+ const vida=html=>html.match(/<article class="escenario gris">[\s\S]*?<\/article>/)[0];
+ assert.equal(tabla(uno),tabla(dos));assert.equal(vida(uno),vida(dos));assert.equal(JSON.stringify(m),antes);
+ assert.doesNotMatch(uno,/seleccionado/);assert.match(uno,/año 1, a tus 40 años/);assert.match(dos,/año 3, a tus 42 años/);
+ assert.match(dos,/ya habrías terminado tus aportaciones/);assert.match(uno,/Si sobrevives al vencimiento/);assert.match(uno,/\$300/);
+});
+test('El recorrido de invalidez separa las coberturas y condiciona ahorro y fallecimiento',()=>{
+ const {escenarioInvalidez}=require('../retiro/escenario-invalidez.cjs');const base=analizar(texto);
+ const exencion=escenarioInvalidez(base,base.tabla[0]);assert.match(exencion,/Exención de primas/);assert.doesNotMatch(exencion,/<h4>Invalidez Sin Espera/);assert.match(exencion,/sin mostrar una indemnización/);assert.match(exencion,/Si sobrevives al vencimiento/);assert.match(exencion,/Si falleces antes, incluso después de la invalidez/);
+ const m=structuredClone(base);m.coberturas=[{tipo:'invalidez',suma:70000}];
+ const solo=escenarioInvalidez(m,m.tabla[0]);assert.match(solo,/<h4>Invalidez Sin Espera/);assert.doesNotMatch(solo,/<h4>Exención de primas/);assert.match(solo,/no se supone que dejes de aportar/);assert.match(solo,/año 1 queda por verificar/);assert.doesNotMatch(solo,/\$1,000/);
+ m.coberturas=[];const sin=escenarioInvalidez(m,m.tabla[0]);assert.match(sin,/pendientes de confirmar/);assert.doesNotMatch(sin,/Si sobrevives al vencimiento|Recibes la indemnización|Dejas de pagar/);
+});
