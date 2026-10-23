@@ -80,3 +80,12 @@ test('El recorrido de invalidez separa las coberturas y condiciona ahorro y fall
  const solo=escenarioInvalidez(m,m.tabla[0]);assert.match(solo,/<h4>Invalidez Sin Espera/);assert.doesNotMatch(solo,/<h4>Exención de primas/);assert.match(solo,/no se supone que dejes de aportar/);assert.match(solo,/año 1 queda por verificar/);assert.doesNotMatch(solo,/\$1,000/);
  m.coberturas=[];const sin=escenarioInvalidez(m,m.tabla[0]);assert.match(sin,/pendientes de confirmar/);assert.doesNotMatch(sin,/Si sobrevives al vencimiento|Recibes la indemnización|Dejas de pagar/);
 });
+
+test('Proyecta aplica la correspondencia confirmada a ISE contratada con sumas iniciales iguales',()=>{
+ const t=texto.replace('$1,000 $90','$1,000 $85').replace('Prima Anual Acumulada','Invalidez Sin Espera $1,000 $5\nPrima Anual Acumulada');
+ const m=analizar(t),c=m.coberturas.find(c=>c.tipo==='invalidez');assert.equal(m.tablaValida,true);assert.equal(c.ambitoSuma,'inicial_y_anual');assert.equal(c.sumasPorAnio[1].suma,103700);assert.equal(c.sumasPorAnio[2].suma,30000);assert.equal(c.suma,100000);assert.match(m.fuentes.invalidez,/confirmada por el asesor/);
+ const {escenarioInvalidez}=require('../retiro/escenario-invalidez.cjs');const html=escenarioInvalidez(m,m.tabla[1]);assert.match(html,/Indemnización prevista para el año 2/);assert.match(html,/\$1,037/);assert.doesNotMatch(html,/queda por verificar/);
+ const invalida=analizar(t.replace('3 42','3 43'));assert.equal(invalida.tablaValida,false);assert.equal(invalida.coberturas.find(c=>c.tipo==='invalidez').sumasPorAnio,null);
+ const distinta=analizar(t.replace('Invalidez Sin Espera $1,000 $5','Invalidez Sin Espera $700 $5'));assert.equal(distinta.tablaValida,true);assert.equal(distinta.coberturas.find(c=>c.tipo==='invalidez').sumasPorAnio,null);assert.match(escenarioInvalidez(distinta,distinta.tabla[1]),/queda por verificar/);
+ const sin=analizar(texto);assert.ok(!sin.coberturas.some(c=>c.tipo==='invalidez'));assert.doesNotMatch(escenarioInvalidez(sin,sin.tabla[1]),/Indemnización prevista/);
+});
