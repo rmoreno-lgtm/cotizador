@@ -17,7 +17,7 @@ Prima Anual Acumulada Valor en Efectivo Proyectado
 Proteccion Contratada:Cantidad que se entregara al final del plazo contratado o antes si ocurre el fallecimiento del Asegurado`;
 test('Ilustración separa efectivo proyectado, primas, protección y exención; muestra solo coberturas identificadas',()=>{
  const m=analizar(texto);assert.equal(m.tablaValida,true);assert.equal(m.tabla.length,3);assert.equal(m.campos.inflacion.valor,'3.7');assert.equal(m.campos.ahorro.valor,'30000');assert.equal(m.ahorroTipo,'proyectado');assert.equal(m.coberturas.find(c=>c.tipo==='exencion').aportacion,1000);assert.equal(m.generacionHabilitada,false);
- const html=vista(m,'retiro',{},2);assert.match(html,/Año 2: <b>\$150/);assert.match(html,/año 2 · 41 años/);assert.match(html,/Exención de primas/);assert.doesNotMatch(html,/Invalidez Sin Espera/);assert.match(html,/\$300/);assert.match(html,/Valor proyectado/);assert.match(html,/<polyline/);
+ const html=vista(m,'retiro',{},2);assert.match(html,/data-anio="2"/);assert.match(html,/\$150/);assert.match(html,/año 2 · 41 años/);assert.match(html,/Exención de primas/);assert.doesNotMatch(html,/Invalidez Sin Espera/);assert.match(html,/\$300/);assert.match(html,/Valor proyectado/);assert.match(html,/<polyline/);
 });
 test('Ilustración rechaza tabla incompleta, duplicada, con acumulado incoherente o años incongruentes',()=>{
  for(const t of [texto.replace('2 41 $103.70 $203.70 $150 74% $1,037\n',''),texto.replace('3 42','2 42'),texto.replace('$203.70 $150','$500 $150'),texto.replace('3 42','3 43')]){
@@ -48,9 +48,9 @@ test('Una mención no acredita contratación y una prima faltante sigue impidien
  const caso=analizar(texto.replace('Exencion de Pago de Primas por Invalidez Total y Permanente Amparada $10','Invalidez Sin Espera $700 $10'));
  assert.equal(caso.tablaValida,true);const escenario=require('../retiro/escenario-invalidez.cjs').escenarioInvalidez(caso,caso.tabla[0]);assert.match(escenario,/Invalidez Sin Espera/);assert.doesNotMatch(escenario,/h4>Exención de primas/);
 });
-test('La vista conserva las 35 filas de un plan largo y ambas mitades de la tabla',()=>{
+test('La vista conserva los 35 años en una sola tabla continua',()=>{
  const cabecera=texto.split('Prima Anual Acumulada')[0].replace('40 anos','25 anos').replace('43 anos','60 anos').replace('2 anos','10 anos');
  const filas=Array.from({length:35},(_,i)=>`${i+1} ${25+i} $${i<10?100:0} $${Math.min(i+1,10)*100} $${(i+1)*50} ${Math.round(100*(i+1)*50/(Math.min(i+1,10)*100))}% $${1000+i*10}`).join('\n');
  const m=analizar(cabecera+'Prima Anual Acumulada Valor en Efectivo Proyectado\n'+filas);assert.equal(m.tablaValida,true);assert.equal(m.tabla.length,35);
- const html=vista(m);assert.match(html,/tablas-anuales/);assert.equal((html.match(/<tr><td>/g)||[]).length,35);assert.match(html,/<td>35<\/td><td>59<\/td>/);
+ const html=vista(m);assert.doesNotMatch(html,/tablas-anuales/);assert.equal((html.match(/<table /g)||[]).length,1);assert.equal((html.match(/data-anio=/g)||[]).length,35);assert.match(html,/<b>35<\/b><\/td><td>59<\/td>/);assert.match(html,/Última aportación/);assert.match(html,/aportación \$0/);
 });

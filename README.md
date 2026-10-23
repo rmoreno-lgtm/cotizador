@@ -138,3 +138,9 @@ El comparativo muestra prima anual, deducible, tabulador, acceso, suma asegurada
 Validación local: `npm test`. La comprobación con el portal real requiere las credenciales de GNP configuradas en Railway.
 
 El PDF comparativo presenta primero los beneficios comunes con el estilo de la propuesta individual; después señala qué cambia respecto a la opción 1 (deducible, tabulador o ambos), la diferencia de prima anual y ejemplos desglosados de participación. La propuesta individual mantiene su diseño.
+
+### Presentación de Vida y Retiro
+
+La propuesta guía al cliente por su objetivo, escenarios y una tabla anual continua a todo el ancho. Destaca la última aportación, el primer año donde el valor en efectivo proyectado alcanza el total aportado y el vencimiento. Ese cruce no representa una tasa de rendimiento ni una garantía. La tabla distingue aportación anual, total aportado, valor en efectivo, porcentaje de recuperación y protección; esta última no se utiliza como suma anual de invalidez. Para ilustraciones de más de 35 años, la tabla continúa en páginas adicionales, sin dividirse en bloques laterales.
+
+La vista previa permite recorrer los años con un control y botones para los hitos; el año elegido actualiza los escenarios y se destaca al exportar. Se conservan los logos guardados. Los datos personales y los PDFs de ejemplo no se incorporan al repositorio.
