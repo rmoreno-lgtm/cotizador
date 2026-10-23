@@ -154,3 +154,19 @@ Los textos dirigidos al prospecto no mencionan el PDF ni el proceso de lectura. 
 Cada enfoque sugiere una frase con el primer nombre del cliente. Después de cargar la ilustración, el asesor puede editar el «Título para este enfoque» (hasta 140 caracteres), aplicarlo a la vista previa o restablecer la sugerencia. Se conserva un título por enfoque durante el borrador y se aplica también antes de descargar, para que el archivo incluya el texto elegido. Los títulos no pasan a otras propuestas ni se guardan como historial del cliente.
 
 La API autenticada `PATCH /api/retiro/:id/titulo` acepta `{enfoque, titulo}`; un título vacío recupera la sugerencia. Valida texto y longitud, y la presentación escapa HTML. El texto personalizado se guarda en el borrador, sin enviarse en las direcciones de la vista previa ni de la descarga.
+
+### Redacción desde contexto con IA
+
+Tras cargar una propuesta, el asesor puede describir las prioridades del cliente en «¿Qué busca este cliente?» y pulsar «Generar título y frase». OpenAI sugiere un título y una frase de cierre para el enfoque seleccionado. Los textos se pueden editar y se aplican al pulsar «Aplicar textos» o antes de descargar. La frase aparece en el cierre de la propuesta. Los cuatro enfoques y la edición manual funcionan sin IA.
+
+Para activar la conexión en producción:
+
+1. En Railway, abrir `quillum-cotizador` → **Variables** y agregar `OPENAI_API_KEY` con una clave de un proyecto de OpenAI con acceso y facturación de API. La facturación de API es independiente de una suscripción de ChatGPT.
+2. Opcionalmente, definir `OPENAI_MODEL`; su valor predeterminado es `gpt-4.1-mini`.
+3. Aplicar los cambios de Railway y recargar el portal. La clave permanece en el servidor y no debe compartirse por chat ni incorporarse al repositorio.
+
+El servidor consulta la API Responses con `store: false`, un límite de salida y un tiempo máximo de 30 segundos. Envía solo el primer nombre, el enfoque y el contexto escrito, sin incluir el PDF, la tabla ni las coberturas. El contexto no se incorpora al historial del cliente ni al almacenamiento persistente de la aplicación. La interfaz informa del envío a OpenAI antes de solicitarlo. Aplican las condiciones de tratamiento de datos del proveedor.
+
+Las respuestas se restringen a dos campos de texto, con límites de longitud y validaciones para rechazar cifras y afirmaciones financieras o contractuales reconocibles. El asesor debe revisar la redacción; la IA no modifica los datos del plan. La aplicación limita las solicitudes simultáneas y la frecuencia de generación. Ante ausencia de clave o errores del proveedor, conserva los textos existentes y permite continuar con la edición manual.
+
+La integración se verifica con respuestas simuladas, incluyendo errores, rechazos y protección de datos. Para confirmar el servicio real hace falta configurar una clave válida en Railway.

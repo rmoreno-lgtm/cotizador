@@ -9,4 +9,8 @@ function validarTitulo(valor){
  if(typeof valor!=='string'||valor.length>140||/[\u0000-\u0008\u000e-\u001f\u007f]/.test(valor))throw Error('El título admite hasta 140 caracteres de texto.');
  return valor.replace(/\s+/g,' ').trim();
 }
-module.exports={sugerido,sugerencias,validarTitulo};
+function validarFrase(valor){
+ if(typeof valor!=='string'||valor.length>160||/[\u0000-\u0008\u000e-\u001f\u007f]/.test(valor))throw Error('La frase de cierre admite hasta 160 caracteres de texto.');
+ return valor.replace(/\s+/g,' ').trim();
+}
+module.exports={sugerido,sugerencias,validarTitulo,validarFrase};
