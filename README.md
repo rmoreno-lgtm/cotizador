@@ -178,3 +178,9 @@ El escenario de invalidez separa exención de primas e indemnización según las
 Por indicación y confirmación del asesor, se utiliza la columna Protección del año seleccionado para la suma ilustrativa de Invalidez Sin Espera en Proyecta cuando esa cobertura está identificada, la tabla completa está validada y su suma inicial coincide con la de fallecimiento y con la primera fila. La correspondencia se registra en los datos de la cobertura y en sus fuentes como regla confirmada por el asesor; no se presenta como una comprobación independiente de las condiciones de la póliza. No se recalculan importes ni se usa el ahorro como sustituto.
 
 Si las sumas iniciales difieren, falta la cobertura o la tabla no es válida, no se asigna esa serie anual a invalidez. Se conserva el dato inicial y se indica la revisión necesaria cuando proceda. La propuesta describe el importe anual como ilustrado, sujeto a vigencia, dictamen y condiciones; la exención se mantiene separada.
+
+### Controles y descarga de Retiro
+
+Junto a la vista previa se agrupan, en este orden, el selector de página, «Descargar propuesta PDF» y el año del escenario de invalidez. En móvil se apilan en el mismo orden. La descarga incluye todas las páginas, independientemente de la página visible.
+
+El área explica por qué la descarga está deshabilitada (datos pendientes, logotipos o una operación en curso) y muestra los errores junto al botón. Al preparar el archivo se conserva un enlace «Guardar PDF preparado» para una descarga iniciada directamente por el usuario si el navegador no inicia la automática. Se verifica que la respuesta sea un PDF. Cambiar los datos de presentación, el año o los logos retira el archivo preparado anterior; cerrar o cargar otra propuesta libera su URL temporal. Una descarga pendiente no publica un archivo de un borrador que haya cambiado.
