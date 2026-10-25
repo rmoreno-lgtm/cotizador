@@ -184,3 +184,16 @@ Si las sumas iniciales difieren, falta la cobertura o la tabla no es válida, no
 Junto a la vista previa se agrupan, en este orden, el selector de página, «Descargar propuesta PDF» y el año del escenario de invalidez. En móvil se apilan en el mismo orden. La descarga incluye todas las páginas, independientemente de la página visible.
 
 El área explica por qué la descarga está deshabilitada (datos pendientes, logotipos o una operación en curso) y muestra los errores junto al botón. Al preparar el archivo se conserva un enlace «Guardar PDF preparado» para una descarga iniciada directamente por el usuario si el navegador no inicia la automática. Se verifica que la respuesta sea un PDF. Cambiar los datos de presentación, el año o los logos retira el archivo preparado anterior; cerrar o cargar otra propuesta libera su URL temporal. Una descarga pendiente no publica un archivo de un borrador que haya cambiado.
+
+### Menú Vida y Ahorro y presentaciones de Retiro
+
+El menú organiza los planes bajo **Vida y Ahorro**: Retiro, PPR, Educación, Ahorro e inversión — Trasciende y Total. Retiro mantiene su formulario; los otros cuatro apartados muestran «Próximamente» y no permiten generar propuestas todavía. Gastos Médicos conserva su propio apartado. Los formularios y el borrador no se reinician al navegar entre secciones. El enlace anterior `#vida` sigue abriendo Retiro; el nuevo es `#retiro`.
+
+Retiro ofrece dos presentaciones independientes del enfoque:
+
+- **Resumida**: dos páginas con objetivo, cifras, línea de vida, gráfica y escenarios. No incluye la tabla anual. La frase de cierre personalizada aparece en el bloque del objetivo.
+- **Detallada**: la presentación existente, con tabla anual completa y frase de cierre. Para las ilustraciones habituales de hasta 35 años son tres páginas; los planes más largos continúan su tabla en páginas adicionales.
+
+Ambas usan los mismos datos validados y coberturas. El formato resumido no permite omitir validaciones ni generar una propuesta con una tabla de origen inválida. Los cuatro enfoques cambian títulos, subtítulos, meta de la línea de vida, textos de acompañamiento e íconos, sin modificar los importes del plan.
+
+Las rutas de vista y PDF aceptan `formato=resumida` o `formato=detallada`; si se omite, se conserva la detallada. El servidor valida el formato y los límites de página. Cambiarlo actualiza la vista y la descarga e invalida cualquier archivo preparado del formato anterior.
