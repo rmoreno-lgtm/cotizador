@@ -1,5 +1,5 @@
 (()=>{
- const $=id=>document.getElementById(id);let archivoPreparado,iaDisponible=false,modelo,frases={},generandoTextos=false,titulos={},sugeridos={},enfoqueTitulo,guardandoTitulo=false,paginas=3,borrador,datosListos=false,descargando=false,logos={quillum:false,gnp:false};
+ const $=id=>document.getElementById(id);let archivoPreparado,iaDisponible=false,modelo,frases={},generandoTextos=false,titulos={},sugeridos={},enfoqueTitulo,guardandoTitulo=false,paginas=3,paginasPorFormato={resumida:2,detallada:3},borrador,datosListos=false,descargando=false,logos={quillum:false,gnp:false};
  const aviso=t=>{$('retiro-estado').textContent=t;};
  async function json(url,options){const r=await fetch(url,options);if(r.status===401){location.assign('/login');throw Error('Inicia sesión.');}const d=await r.json();if(!r.ok)throw Error(d.error||'No se pudo completar la solicitud.');return d;}
  function limpiarArchivo(){if(archivoPreparado)URL.revokeObjectURL(archivoPreparado);archivoPreparado=undefined;$('retiro-descarga-enlace').hidden=true;$('retiro-descarga-enlace').removeAttribute('href');}
@@ -12,7 +12,14 @@
 
  function mostrarLogos(d){logos={quillum:!!d.quillum,gnp:!!d.gnp};$('retiro-logos-estado').textContent='QUILLUM: '+(logos.quillum?'guardado':'pendiente')+' · GNP: '+(logos.gnp?'guardado':'pendiente')+'.';if(!logos.quillum||!logos.gnp)$('retiro-logos').open=true;actualizarDescarga();}
  async function eliminar(){limpiarArchivo();estadoDescarga('');if(borrador){await json('/api/retiro/'+borrador,{method:'DELETE'});borrador=undefined;}datosListos=false;modelo=undefined;$('retiro-presentacion').hidden=true;titulos={};frases={};sugeridos={};enfoqueTitulo=undefined;$('retiro-anio').disabled=true;explorar();$('retiro-contexto').value='';$('retiro-frase').value='';actualizarDescarga();}
- function parametros(){const q=new URLSearchParams({enfoque:$('retiro-enfoque').value});if(!$('retiro-anio').disabled)q.set('anio',$('retiro-anio').value);return q;}
+ function parametros(){const q=new URLSearchParams({enfoque:$('retiro-enfoque').value,formato:$('retiro-formato').value});if(!$('retiro-anio').disabled)q.set('anio',$('retiro-anio').value);return q;}
+ function actualizarPaginas(){
+  paginas=paginasPorFormato[$('retiro-formato').value];const selector=$('retiro-pagina'),anterior=Number(selector.value)||1;selector.replaceChildren();
+  for(let n=1;n<=paginas;n++)selector.add(new Option(n+' · '+(n===1?'Tu proyecto':n===2?'Escenarios de vida':n===3?'Tus números':'Tabla · continuación'),String(n)));selector.value=String(Math.min(anterior,paginas));
+  $('retiro-total-paginas').textContent=($('retiro-formato').value==='resumida'?'Presentación resumida':'Presentación detallada')+' · El PDF incluye las '+paginas+' páginas.';
+  $('retiro-formato').querySelector('[value=detallada]').textContent='Detallada · '+paginasPorFormato.detallada+' páginas';
+ }
+ $('retiro-formato').addEventListener('change',()=>{limpiarArchivo();estadoDescarga('');actualizarPaginas();mostrar();});
  function mostrar(){if(!borrador)return;const frame=$('retiro-vista');frame.hidden=false;$('retiro-navegacion').hidden=false;const ancho=Math.max(280,Math.min(2000,frame.clientWidth||818));const q=parametros();q.set('pagina',$('retiro-pagina').value);q.set('ancho',String(ancho));frame.style.height=Math.ceil(1180*Math.min(1,(ancho-24)/794)+32)+'px';frame.src='/api/retiro/'+borrador+'/vista?'+q;}
  function explorar(){
   const f=modelo?.tablaValida?modelo.tabla.find(f=>f.anio===Number($('retiro-anio').value)):undefined;
@@ -60,7 +67,7 @@
   try{
    await eliminar();$('retiro-vista').hidden=true;$('retiro-navegacion').hidden=true;
    const data=await json('/api/retiro/preview',{method:'POST',body:new FormData($('retiro-form'))});
-   borrador=data.id;modelo=data.modelo;paginas=data.paginas||3;datosListos=data.datosListos;sugeridos=data.titulos||{};titulos={...sugeridos};frases={};tituloActual();$('retiro-titulo-estado').textContent='Puedes usar el título sugerido o escribir el tuyo.';mostrarLogos(data.logos);
+   borrador=data.id;modelo=data.modelo;paginasPorFormato=data.paginasPorFormato||{resumida:2,detallada:data.paginas||3};datosListos=data.datosListos;sugeridos=data.titulos||{};titulos={...sugeridos};frases={};tituloActual();$('retiro-titulo-estado').textContent='Puedes usar el título sugerido o escribir el tuyo.';mostrarLogos(data.logos);
    const lista=$('retiro-incidencias');lista.replaceChildren();
    for(const texto of data.modelo.incidencias){const li=document.createElement('li');li.textContent=texto;lista.append(li);}
    const evidencias=$('retiro-evidencias');evidencias.replaceChildren();
@@ -73,8 +80,7 @@
    const anios=$('retiro-anio');anios.replaceChildren();anios.disabled=!data.modelo.tablaValida||!data.modelo.coberturas?.some(c=>['exencion','invalidez'].includes(c.tipo));
    if(!anios.disabled){for(const fila of data.modelo.tabla)anios.add(new Option('Año '+fila.anio+' · Edad '+fila.edad,fila.anio));anios.value=String(Math.min(6,data.modelo.tabla.length));}
    else anios.add(new Option('Disponible con tabla y cobertura de invalidez',''));
-   const selector=$('retiro-pagina');selector.replaceChildren();for(let n=1;n<=paginas;n++)selector.add(new Option(n+' · '+(n===1?'Tu proyecto':n===2?'Escenarios de vida':n===3?'Tus números':'Tabla · continuación'),String(n)));$('retiro-total-paginas').textContent='El PDF incluye las '+paginas+' páginas.';
-   selector.value='1';explorar();mostrar();actualizarDescarga();
+   actualizarPaginas();$('retiro-pagina').value='1';explorar();mostrar();actualizarDescarga();
    aviso((datosListos?'Ilustración leída: '+data.modelo.tabla.length+' años. ':'Hay datos por revisar en la ilustración. ')+(!datosListos?'La descarga se habilitará al validar los datos pendientes.':logos.quillum&&logos.gnp?'Revisa la vista previa y descarga tu propuesta PDF.':'Guarda los logos de QUILLUM y GNP para habilitar la descarga.'));
   }catch(e){aviso(e.message);}finally{$('retiro-cargar').disabled=false;}
  });

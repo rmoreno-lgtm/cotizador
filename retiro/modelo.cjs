@@ -3,10 +3,10 @@ const crypto=require('node:crypto');
 const {ilustracion}=require('./ilustracion.cjs');
 const {ocr}=require('./ocr.cjs');
 const ENFOQUES={
- retiro:{nombre:'Retiro personal',titulo:'construyamos un plan para tu retiro.',subtitulo:'Ahorro y protección para tu futuro.',texto:'Un patrimonio para disfrutar tu futuro con tranquilidad.',icono:'☀'},
- independencia:{nombre:'Independencia',titulo:'demos forma a tu independencia.',subtitulo:'Ahorro y protección para tus decisiones.',texto:'Un plan para ampliar tus posibilidades y elegir tu camino.',icono:'↗'},
- personas:{nombre:'Personas importantes',titulo:'cuidemos el futuro de quienes más quieres.',subtitulo:'Ahorro y protección para sus proyectos.',texto:'Una meta que nace de las personas que más te importan.',icono:'♡'},
- patrimonio:{nombre:'Patrimonio',titulo:'construyamos tu patrimonio paso a paso.',subtitulo:'Ahorro y protección para tus objetivos.',texto:'Una estrategia para dar forma a tus objetivos de largo plazo.',icono:'◇'}
+ retiro:{nombre:'Retiro personal',titulo:'construyamos un plan para tu retiro.',subtitulo:'Ahorro y protección para tu futuro.',texto:'Un patrimonio para disfrutar tu futuro con tranquilidad.',icono:'☀',meta:'Tu retiro',escenario:'Tu retiro, con respaldo para distintos caminos.'},
+ independencia:{nombre:'Independencia',titulo:'demos forma a tu independencia.',subtitulo:'Ahorro y protección para tus decisiones.',texto:'Un plan para ampliar tus posibilidades y elegir tu camino.',icono:'↗',meta:'Tu independencia',escenario:'Tu libertad de decidir, a lo largo de tu plan.'},
+ personas:{nombre:'Personas importantes',titulo:'cuidemos el futuro de quienes más quieres.',subtitulo:'Ahorro y protección para sus proyectos.',texto:'Una meta que nace de las personas que más te importan.',icono:'♡',meta:'Tu meta para ellos',escenario:'Un plan pensado en quienes más quieres.'},
+ patrimonio:{nombre:'Patrimonio',titulo:'construyamos tu patrimonio paso a paso.',subtitulo:'Ahorro y protección para tus objetivos.',texto:'Una estrategia para dar forma a tus objetivos de largo plazo.',icono:'◇',meta:'Tu patrimonio',escenario:'Tu patrimonio, con una visión de largo plazo.'}
 };
 function analizar(texto) {
  if(typeof texto!=='string' || texto.length>1500000)throw Error('El documento excede el límite de lectura.');
