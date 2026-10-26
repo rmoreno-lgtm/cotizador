@@ -187,7 +187,7 @@ El área explica por qué la descarga está deshabilitada (datos pendientes, log
 
 ### Menú Vida y Ahorro y presentaciones de Retiro
 
-El menú organiza los planes bajo **Vida y Ahorro**: Retiro, PPR, Educación, Ahorro e inversión — Trasciende y Total. Retiro mantiene su formulario; los otros cuatro apartados muestran «Próximamente» y no permiten generar propuestas todavía. Gastos Médicos conserva su propio apartado. Los formularios y el borrador no se reinician al navegar entre secciones. El enlace anterior `#vida` sigue abriendo Retiro; el nuevo es `#retiro`.
+El menú organiza los planes bajo **Vida y Ahorro**: Retiro, PPR, Educación, Ahorro e inversión — Trasciende y Total. Retiro y PPR tienen formularios propios; Educación, Trasciende y Total muestran «Próximamente». Gastos Médicos conserva su propio apartado. Los formularios y el borrador no se reinician al navegar entre secciones. El enlace anterior `#vida` sigue abriendo Retiro; el nuevo es `#retiro`.
 
 Retiro ofrece dos presentaciones independientes del enfoque:
 
@@ -197,3 +197,20 @@ Retiro ofrece dos presentaciones independientes del enfoque:
 Ambas usan los mismos datos validados y coberturas. El formato resumido no permite omitir validaciones ni generar una propuesta con una tabla de origen inválida. Los cuatro enfoques cambian títulos, subtítulos, meta de la línea de vida, textos de acompañamiento e íconos, sin modificar los importes del plan.
 
 Las rutas de vista y PDF aceptan `formato=resumida` o `formato=detallada`; si se omite, se conserva la detallada. El servidor valida el formato y los límites de página. Cambiarlo actualiza la vista y la descarga e invalida cualquier archivo preparado del formato anterior.
+
+
+### PPR Consolida: ejercicio fiscal supuesto
+
+PPR permite cargar ilustraciones Consolida GNP en MXN con vencimiento a los 65 años y columna explícita de monto deducible del artículo 151. Lee las tablas completas y compactas, y conserva el plazo real de aportaciones: admite pagos limitados de 5 o 10 años y plazos hasta los 65, sin sustituir el plazo leído. Los casos con mezcla de artículo 185, moneda distinta, tablas incompletas o cifras contradictorias requieren revisión y no permiten emitir.
+
+El ejercicio usa un **supuesto fijo del 30% aplicado al monto potencialmente deducible, no a toda la prima**. Supone que ese monto completo resulta aplicable y produce dicho efecto fiscal. No calcula límites personales, UMA, tarifa efectiva, ISR real ni devoluciones. Ejemplo: aportación de $200,000, monto para deducción de $192,824, beneficio supuesto de $57,847.20 y desembolso neto ilustrativo de $142,152.80. GNP recibe los $200,000 completos; el efecto fiscal se presenta por separado y depende de los límites y situación del contribuyente. No constituye una promesa de devolución ni un descuento de la prima.
+
+No se han validado en esta implementación topes fiscales vigentes contra fuentes oficiales. El tratamiento de retiros, vencimiento y retenciones se mantiene sujeto a la legislación y contrato; no se afirma que el vencimiento esté libre de impuestos. Recuperación y protección se identifican como proyectadas. El beneficio no se suma al ahorro ni se reinvierte automáticamente.
+
+La presentación resumida incluye dos páginas; la detallada agrega la tabla anual, con hasta 15 filas por página y continuación vertical. El selector fiscal permite elegir un año con aportación y cambia únicamente el ejercicio de la segunda página. La tabla conserva todos los años, destaca el fin de aportaciones y el vencimiento. Los totales fiscales suman las aportaciones anuales; diferencias de un peso por redondeo con acumulados impresos se señalan para revisión. No se inventan coberturas de invalidez a partir de otras columnas.
+
+Los logos usan el mismo almacenamiento persistente de Retiro: se cargan una vez para ambos módulos. Los borradores PPR viven en memoria durante 30 minutos, con máximo cinco; las cargas no se agregan al historial persistente. Las rutas `/api/ppr` requieren autenticación. La descarga verifica el contenido PDF y ofrece un enlace alternativo al archivo preparado. El renderizado Chromium es compartido con Retiro y rechaza contenido que invada el pie de página. OCR limita Tesseract a un hilo por proceso para evitar saturación durante lecturas simultáneas.
+
+Validación: pruebas automáticas del cálculo, lectura, inconsistencias, formatos y autenticación; carga y descarga en navegador con las tres ilustraciones proporcionadas, revisión móvil, logos compartidos y regresión de descarga de Retiro. Las pruebas sintéticas cubren pagos de 5, 9 y 10 años sin incluir documentos ni datos personales en el repositorio.
+
+La portada PPR enfatiza el ahorro en impuestos mediante una barra proporcional que separa el desembolso neto ilustrativo del ahorro fiscal supuesto, con ambos importes y la aportación completa. El año fiscal seleccionado actualiza esta comparación y el cálculo paso a paso de la segunda página. La protección por fallecimiento, el ahorro al vencimiento y el ahorro fiscal se describen por separado; no se suman como beneficios simultáneos. La gráfica de evolución se conserva en Retiro; la portada PPR prioriza la explicación fiscal.

@@ -8,7 +8,7 @@ async function ocr(parser,total){
    const imagen=await parser.getScreenshot({partial:[numero],desiredWidth:1836,imageDataUrl:false});
    const archivo=path.join(dir,numero+'.png');await fs.writeFile(archivo,imagen.pages[0].data,{mode:0o600});
    try{
-    const {stdout}=await ejecutar('tesseract',[archivo,'stdout','-l','eng','--psm','3'],{timeout:30000,maxBuffer:2*1024*1024});
+    const {stdout}=await ejecutar('tesseract',[archivo,'stdout','-l','eng','--psm','3'],{env:{...process.env,OMP_THREAD_LIMIT:'1'},timeout:30000,maxBuffer:2*1024*1024});
     paginas.push(stdout);
    }catch(e){if(e.code==='ENOENT')throw Error('Este PDF necesita OCR. Instala Tesseract para leer las páginas escaneadas.');throw Error('No se pudo completar el OCR de la página '+numero+'.');}
    await fs.unlink(archivo);
