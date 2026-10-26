@@ -2,6 +2,7 @@ const crypto=require('node:crypto');
 const multer=require('multer');
 const {leer,ejercicio}=require('./modelo.cjs');
 const {vista,paginas}=require('./vista.cjs');
+const {textos,validar}=require('./titulos.cjs');
 const {almacenLogos}=require('../retiro/logos.cjs');
 const {renderizarPdf}=require('../documento-pdf.cjs');
 function registrar(app,{base,env,limpiarError}){
@@ -13,14 +14,15 @@ function registrar(app,{base,env,limpiarError}){
  app.post('/api/ppr/preview',upload,async(req,res)=>{
   limpiar();if(leyendo)return res.status(429).json({error:'Hay una ilustración PPR en lectura. Intenta de nuevo en unos momentos.'});
   if(borradores.size>=5)return res.status(429).json({error:'Cierra un borrador PPR antes de cargar otra ilustración.'});
-  leyendo=true;try{const modelo=await leer(req.file?.buffer),id=crypto.randomUUID();borradores.set(id,{modelo,expira:Date.now()+30*60000});const l=await logos.leer();res.status(201).json({id,modelo,ejercicio:modelo.tablaValida?ejercicio(modelo):undefined,datosListos:modelo.tablaValida,logos:estado(l),paginasPorFormato:{resumida:2,detallada:paginas(modelo)}});}catch(e){res.status(400).json({error:limpiarError(e,env)});}finally{leyendo=false;}
+  leyendo=true;try{const modelo=await leer(req.file?.buffer),id=crypto.randomUUID();borradores.set(id,{modelo,textos:textos(modelo),expira:Date.now()+30*60000});const l=await logos.leer();res.status(201).json({id,modelo,textos:textos(modelo),ejercicio:modelo.tablaValida?ejercicio(modelo):undefined,datosListos:modelo.tablaValida,logos:estado(l),paginasPorFormato:{resumida:2,detallada:paginas(modelo)}});}catch(e){res.status(400).json({error:limpiarError(e,env)});}finally{leyendo=false;}
  });
  function seleccion(req,res){
   limpiar();const b=borradores.get(req.params.id);if(!b){res.status(404).json({error:'El borrador PPR expiró. Vuelve a cargar la ilustración.'});return;}
   const formato=req.query.formato===undefined?'detallada':req.query.formato;if(!['detallada','resumida'].includes(formato)){res.status(400).json({error:'Presentación inválida.'});return;}
   const anio=req.query.anio===undefined?undefined:Number(req.query.anio);if(anio!==undefined&&(!Number.isSafeInteger(anio)||!b.modelo.tablaValida||!b.modelo.tabla.some(f=>f.anio===anio&&f.aportacion>0))){res.status(400).json({error:'Elige un año con aportaciones para el ejercicio fiscal.'});return;}
-  return {modelo:b.modelo,opciones:{formato,anio}};
+  return {modelo:b.modelo,opciones:{formato,anio,textos:b.textos}};
  }
+ app.patch('/api/ppr/:id/textos',require('express').json({limit:'4kb'}),(req,res)=>{limpiar();const b=borradores.get(req.params.id);if(!b)return res.status(404).json({error:'El borrador PPR expiró.'});try{b.textos=validar(b.modelo,req.body||{});res.json(b.textos);}catch(e){res.status(400).json({error:limpiarError(e,env)});}});
  app.get('/api/ppr/:id/vista',async(req,res)=>{
   const s=seleccion(req,res);if(!s)return;const pagina=req.query.pagina===undefined?1:Number(req.query.pagina),ancho=req.query.ancho===undefined?818:Number(req.query.ancho);
   if(!Number.isInteger(pagina)||pagina<1||pagina>paginas(s.modelo,s.opciones.formato)||!Number.isFinite(ancho)||ancho<280||ancho>2000)return res.status(400).json({error:'Vista previa inválida.'});

@@ -30,3 +30,10 @@ test('La API de PPR requiere sesión y valida archivos y borradores',async()=>{
  const fs=require('node:fs/promises'),{crearApp}=require('../server.cjs'),dir=await fs.mkdtemp('/tmp/ppr-test-');const {app,cola}=await crearApp({env:{APP_SECRET:'secreto-local-de-prueba-no-utilizar-en-produccion',DATA_DIR:dir}}),s=app.listen(0,'127.0.0.1');await new Promise(r=>s.once('listening',r));const base='http://127.0.0.1:'+s.address().port,headers={Authorization:'Bearer secreto-local-de-prueba-no-utilizar-en-produccion'};
  try{assert.equal((await fetch(base+'/api/ppr/preview',{method:'POST'})).status,401);assert.equal((await fetch(base+'/api/ppr/x/pdf')).status,401);assert.equal((await fetch(base+'/api/ppr/x/vista')).status,401);assert.equal((await fetch(base+'/api/ppr/x/vista',{headers})).status,404);const form=new FormData();form.append('pdf',new Blob(['sin pdf']),'x.pdf');assert.equal((await fetch(base+'/api/ppr/preview',{method:'POST',headers,body:form})).status,400);}finally{cola.cerrada=true;s.closeAllConnections();await new Promise(r=>s.close(r));await fs.rm(dir,{recursive:true,force:true});}
 });
+test('Resumen distingue total, ahorro fiscal y vencimiento; títulos editables sin cambiar cifras',()=>{
+ const {textos,validar}=require('../ppr/titulos.cjs');const m=analizar(documento()),antes=JSON.stringify(m);const html=vista(m,{}, {textos:validar(m,{enfoque:'patrimonio',titulo:'Mi <plan>',subtitulo:'Mi estrategia'})});
+ assert.match(html,/Mi &lt;plan&gt;/);assert.match(html,/Total que aportarías/);assert.match(html,/Desde el año 6 dejas de aportar/);assert.match(html,/Tu plan, de principio a fin/);
+ const final=html.match(/<tr class="final">(.*?)<\/tr>/)[1];assert.equal((final.match(/<strong>/g)||[]).length,1);assert.equal(JSON.stringify(m),antes);
+ for(const enfoque of ['retiro','independencia','familia','patrimonio'])assert.ok(textos(m,enfoque).titulo.startsWith('Persona,'));
+ assert.throws(()=>validar(m,{enfoque:'otro'}));assert.throws(()=>validar(m,{enfoque:'retiro',titulo:'a'.repeat(141)}));
+});

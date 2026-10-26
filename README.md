@@ -214,3 +214,11 @@ Los logos usan el mismo almacenamiento persistente de Retiro: se cargan una vez 
 Validación: pruebas automáticas del cálculo, lectura, inconsistencias, formatos y autenticación; carga y descarga en navegador con las tres ilustraciones proporcionadas, revisión móvil, logos compartidos y regresión de descarga de Retiro. Las pruebas sintéticas cubren pagos de 5, 9 y 10 años sin incluir documentos ni datos personales en el repositorio.
 
 La portada PPR enfatiza el ahorro en impuestos mediante una barra proporcional que separa el desembolso neto ilustrativo del ahorro fiscal supuesto, con ambos importes y la aportación completa. El año fiscal seleccionado actualiza esta comparación y el cálculo paso a paso de la segunda página. La protección por fallecimiento, el ahorro al vencimiento y el ahorro fiscal se describen por separado; no se suman como beneficios simultáneos. La gráfica de evolución se conserva en Retiro; la portada PPR prioriza la explicación fiscal.
+
+### Resumen PPR y títulos personalizados
+
+La portada presenta el total de aportaciones programadas, el ahorro fiscal supuesto acumulado, el desembolso neto ilustrativo acumulado y el ahorro proyectado al vencimiento. La barra compara los totales de todo el periodo de aportaciones; el selector de año modifica únicamente el ejercicio anual de la segunda página. El cierre reúne esos mismos totales y el ahorro al vencimiento, sin sumar el beneficio fiscal al valor del plan ni afirmar que el vencimiento es un importe neto de impuestos.
+
+En la tabla se indica el primer año sin aportaciones programadas, según el calendario real de la ilustración. El último renglón mantiene su fondo verde y solo la recuperación proyectada se encierra en un círculo; la protección conserva su cifra sin círculo.
+
+«Personalizar el título del plan» ofrece sugerencias para Retiro personal, Independencia, Personas importantes y Patrimonio, con título y subtítulo editables. Los cambios se guardan en el borrador con `PATCH /api/ppr/:id/textos`; se validan sus longitudes, se escapan al presentar y se aplican también antes de descargar. Los campos vacíos recuperan la sugerencia del enfoque. Son cambios editoriales: no modifican cifras, coberturas ni cálculos fiscales, y no requieren un proveedor de IA.
