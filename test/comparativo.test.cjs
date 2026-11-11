@@ -36,6 +36,8 @@ test('API protege y entrega cada original; PDF único no puede simular comparati
   for(let i=1;i<=3;i++)assert.equal(await (await fetch(url+'/api/jobs/'+j.id+'/files/gnp-'+i,{headers})).text(),'%PDF-opcion-'+i);
   const pdf=await fetch(url+'/api/jobs/'+j.id+'/files/propuesta',{headers});assert.equal(pdf.status,200);assert.match(pdf.headers.get('content-disposition'),/Comparativo-QUILLUM.pdf/);
   assert.equal((await fetch(url+'/api/jobs/'+j.id+'/files/gnp-4',{headers})).status,404);
+  const alta=await fetch(url+'/api/jobs',{method:'POST',headers,body:JSON.stringify({...base,compararAlta:true})});assert.equal(alta.status,202);const ja=await alta.json();assert.equal(ja.solicitud.compararAlta,true);assert.deepEqual(ja.solicitud.opciones.map(o=>o.alta),[false,true]);
+  for(let i=0;i<50&&cola.jobs.get(ja.id).estado!=='completada';i++)await new Promise(r=>setTimeout(r,10));assert.equal(cola.jobs.get(ja.id).estado,'completada');assert.equal((await fetch(url+'/api/jobs/'+ja.id+'/files/gnp-2',{headers})).status,200);assert.equal((await fetch(url+'/api/jobs/'+ja.id+'/files/gnp-3',{headers})).status,404);
   const form=new FormData();form.append('solicitud',JSON.stringify(base));form.append('pdf',new Blob(['%PDF-prueba']),'gnp.pdf');assert.equal((await fetch(url+'/api/pdf',{method:'POST',headers:{Authorization:headers.Authorization},body:form})).status,400);
  }finally{cola.cerrada=true;server.closeAllConnections();await new Promise(r=>server.close(r));await fs.rm(dir,{recursive:true,force:true});}
 });
@@ -59,4 +61,23 @@ test('presentación distingue deducible y tabulador; beneficios preceden precio 
  const contenido=documentoComparativo('logo','qr',{opciones:[primero,segundo,tercero]});
  assert.ok(contenido.indexOf('<h3>Médica Móvil')<contenido.indexOf('OPCIÓN 1'));assert.ok(contenido.includes('En accidente cubierto no pagas deducible.'));assert.ok(contenido.includes('$100.00 menos al año'));assert.ok(contenido.includes('Misma participación'));assert.ok(contenido.includes('Tu participación total'));
  const sinAlta=documentoComparativo('logo','qr',{opciones:[primero,segundo]});assert.ok(!sinAlta.includes('<h3>Alta Tecnología'));
+});
+test('comparativo Alta Tecnología genera dos opciones con las mismas condiciones y valida su cobertura',()=>{
+ const s=solicitud({...base,compararAlta:true,alta:true});assert.equal(s.alta,false);assert.deepEqual(s.opciones,[{deducible:'32000',tabulador:'A',alta:false},{deducible:'32000',tabulador:'A',alta:true}]);
+ assert.throws(()=>solicitud({...base,compararAlta:'sí'}),/sí o no/);
+ const sin=datos({...s,alta:false}),con={...datos({...s,alta:true}),altaConfirmada:true,monto:{...sin.monto,total:sin.monto.total+12345}};
+ validarComparacion([sin,con],true);assert.throws(()=>validarComparacion([sin,con]),/mismo perfil/);
+ for(const mal of [{...con,altaConfirmada:false},{...con,tabulador:'B'},{...con,niveles:con.niveles.map(n=>({...n,tope:n.tope+1}))},{...con,coberturas:['Otra cobertura']},{...con,asegurados:[]}])assert.throws(()=>validarComparacion([sin,mal],true));
+ assert.throws(()=>validarComparacion([con,sin],true));validarComparacion([sin,{...con,altaConfirmada:false,altaVerificadaEnPortal:true}],true);
+ const h=documentoComparativo('logo','qr',{opciones:[sin,con],compararAlta:true});assert.match(h,/Sin Alta Tecnología/);assert.match(h,/Con Alta Tecnología/);assert.match(h,/\$123.45 más al año/);assert.match(h,/no cuantifica una participación adicional/);assert.match(h,/cirugía robótica/);
+ assert.ok(!h.slice(0,h.indexOf('OPCIÓN 1')).includes('<h3>Alta Tecnología y Medicina de Vanguardia</h3>'));
+});
+test('cotiza con y sin Alta Tecnología en una sesión y exige verificación antes de emitir',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'comparativo-alta-'));const llamadas=[];let aperturas=0,cierres=0,generados=0,verificar=true;
+ const s=solicitud({...base,compararAlta:true});const deps={env:{},crearSesion:async()=>{aperturas++;return {cotizar:async(s,p)=>{llamadas.push(s);await fs.writeFile(p,'%PDF-'+s.alta);return {...s,altaVerificadaEnPortal:s.alta};},cerrar:async()=>{cierres++;}};},leer:async(p,s)=>({...datos(s),altaVerificadaEnPortal:verificar&&s.altaVerificadaEnPortal}),generar:async(d)=>{generados++;assert.equal(d.compararAlta,true);assert.match(documentoComparativo('logo','qr',d),/Con o sin Alta Tecnología/);return path.join(dir,'comparativo.pdf');}};
+ try{
+ const r=await ejecutarComparativo({id:'alta',solicitud:s},dir,deps);assert.deepEqual(llamadas.map(s=>s.alta),[false,true]);assert.ok(llamadas.every(o=>o.deducible===s.deducible&&o.tabulador===s.tabulador&&!o.compararAlta));assert.equal(aperturas,1);assert.equal(cierres,1);assert.deepEqual(r.opciones.map(o=>o.alta),[false,true]);
+ llamadas.length=0;await ejecutarComparativo({id:'alta',solicitud:s},dir,deps);assert.equal(llamadas.length,0);
+ verificar=false;await assert.rejects(ejecutarComparativo({id:'alta',solicitud:s},dir,deps),/No se verificaron/);assert.equal(generados,2);
+ }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
