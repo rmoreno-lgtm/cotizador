@@ -4,6 +4,7 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 function documento(logo, qr, datos) {
+  const alta=!!datos.altaBeneficioHtml;
   const header = `<header><img class="logo" src="${logo}" alt="QUILLUM Seguros y Fianzas"><div class="insurer">PROPUESTA PERSONALIZADA<br><b>Aseguradora: GNP</b><br>Seguro Médico ${datos.plan}</div></header>`;
   const footer = n => `<footer>QUILLUM · Cotización GNP ${datos.folio} · Propuesta informativa<span>${n} / 3</span></footer>`;
   return `<!doctype html><html lang="es"><meta charset="utf-8"><title>Propuesta QUILLUM ${datos.folio}</title>
@@ -58,12 +59,14 @@ footer span { float:right; }
 .keybenefit h3 { font-size:11px; margin:0; }
 .asistencias .card { border-top:3px solid #ef8924; }
 .asistencias h3 { color:#104b74; font-size:13px; }
+${require('./alta-tecnologia.cjs').estilo}
 </style>
-<section class="page">${header}
+<section class="page${alta?' alta-portada':''}">${header}
 <div class="eyebrow">01 / PROTECCIÓN Y ACOMPAÑAMIENTO</div>
 <h1>Tu protección médica,<br>con el respaldo de QUILLUM.</h1>
 <p>Preparada para <b>${datos.nombre}</b>.<br>${datos.perfilHtml}</p>
 ${datos.beneficiosHtml || ""}
+${datos.altaBeneficioHtml || ""}
 <div class="row">
 <div class="card"><h3>Suma asegurada básica</h3><strong>$${datos.suma}</strong><p>Por año póliza, por asegurado.</p></div>
 <div class="card"><h3>Tu configuración</h3><strong>Acceso ${datos.acceso}</strong><p>Tabulador médico ${datos.tabulador}. Participación variable según nivel hospitalario.</p></div>
@@ -77,7 +80,7 @@ ${datos.beneficiosHtml || ""}
 <p class="small">Aplican condiciones, disponibilidad y alcance de cada servicio.</p>
 <div class="hero"><div><small>INVERSIÓN ANUAL TOTAL · MXN</small><strong>$${datos.total}</strong></div><p>Pago anual.<br>Incluye derecho de póliza e IVA.</p></div>
 <p class="small">Prima neta: $${datos.neta} · Derecho de póliza: $${datos.derecho} · IVA: $${datos.iva}.<br>Recargo por pago fraccionado: $${datos.recargo} · Descuento por Solidez Familiar${datos.descuentoIncluidoEnNeta ? ' (ya aplicado)' : ''}: $${datos.descuento}.</p>
-<div class="strip"><h3>El respaldo de QUILLUM, cuando más lo necesitas</h3><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p></div>
+${alta?'':'<div class="strip"><h3>El respaldo de QUILLUM, cuando más lo necesitas</h3><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p></div>'}
 <p class="small">Cotizada: ${datos.fecha} · Válida hasta: ${datos.vence}.<br>Asesor registrado en GNP: ${datos.agente}.</p>
 ${footer(1)}</section>
 

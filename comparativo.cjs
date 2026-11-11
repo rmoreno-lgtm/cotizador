@@ -26,6 +26,8 @@ function documentoComparativo(logo,qr,{opciones:ds,compararAlta=false}) {
   validarComparacion(ds,compararAlta);
   const {crearVista}=require('./integracion.cjs');
   const base=ds[0],v=crearVista(base),precio=x=>'$'+dinero(x,true),nivel=(d,n)=>d.niveles.find(x=>x.nivel===n);
+  const mostrarAlta=compararAlta||base.altaSolicitada||base.altaConfirmada;
+  const bloque=mostrarAlta?require('./alta-tecnologia.cjs').bloqueAlta({comparativo:compararAlta,verificada:ds.filter(d=>d.altaSolicitada||d.altaConfirmada).every(d=>d.altaConfirmada||d.altaVerificadaEnPortal===true)}):'';
   const altaTexto=compararAlta?crearVista(ds[1]).altaHtml:'';
   const alcanceAlta='<div class="strip"><h3>¿Qué cambia con Alta Tecnología?</h3><p><b>Sin la cobertura:</b> puede aplicar una participación adicional en determinados procedimientos e insumos especializados. <b>Con la cobertura:</b> se evita esa participación adicional conforme a las condiciones de GNP. Siguen aplicando deducible, coaseguro, límites y exclusiones.</p></div>';
   const estilo=require('node:fs').readFileSync(path.join(__dirname,'comparativo-estilo.css'),'utf8');
@@ -54,7 +56,8 @@ function documentoComparativo(logo,qr,{opciones:ds,compararAlta=false}) {
     ['Tu participación total',d=>precio(calculo(gasto,nivel(d,n)).total)],
     ['Frente a opción 1',d=>d===base?'Referencia':diferenciaParticipacion(d,n)]
   ]);
-  return `<!doctype html><html lang="es"><meta charset="utf-8"><title>Comparativo QUILLUM</title><style>${estilo}</style><body>
+  return `<!doctype html><html lang="es"><meta charset="utf-8"><title>Comparativo QUILLUM</title><style>${estilo}
+${require('./alta-tecnologia.cjs').estilo}</style><body>
 <section class="page">${encabezado}<div class="eyebrow">01 / PROTECCIÓN Y ACOMPAÑAMIENTO</div>
 <h1>Tu protección médica,<br>con el respaldo de QUILLUM.</h1><p>Preparada para <b>${html(base.nombre)}</b>.<br>${v.perfilHtml}</p>
 ${v.beneficiosHtml}
@@ -62,14 +65,14 @@ ${v.beneficiosHtml}
 <h2>También te acompaña en el día a día</h2><div class="row asistencias"><div class="card"><h3>Asistencia dental</h3><p>${v.dentalHtml}</p></div><div class="card"><h3>Apoyo psicológico</h3><p>${v.psicologicaHtml}</p></div><div class="card"><h3>Médica Móvil</h3><p>${v.movilHtml}</p></div></div><p class="small">Aplican condiciones, disponibilidad y alcance de cada servicio.</p>
 <div class="strip"><h3>El respaldo de QUILLUM, cuando más lo necesitas</h3><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p></div>
 <h2>${compararAlta?'Mismo plan, con o sin Alta Tecnología':'Una misma protección, distintas formas de participar'}</h2><p>En las siguientes páginas encontrarás ${ds.length} opciones, sus diferencias de precio y ejemplos de lo que pagarías al usar tu seguro.</p>${pie(1)}</section>
-<section class="page">${encabezado}<div class="eyebrow">02 / ELIGE TU CONFIGURACIÓN</div><h1>${compararAlta?'Con o sin Alta Tecnología.':'¿Qué cambia entre tus opciones?'}</h1><p>Cada opción adicional se compara con la opción 1. Los campos resaltados en naranja muestran cambios.</p><div class="options">${tarjetas}</div>
+<section class="page${mostrarAlta?' alta-configuracion':''}">${encabezado}<div class="eyebrow">02 / ELIGE TU CONFIGURACIÓN</div><h1>${compararAlta?'Con o sin Alta Tecnología.':'¿Qué cambia entre tus opciones?'}</h1><p>Cada opción adicional se compara con la opción 1. Los campos resaltados en naranja muestran cambios.</p>${bloque}<div class="options">${tarjetas}</div>
 ${tabla([
  ['Deducible base · nivel A',d=>precio(nivel(d,'A').deducible),d=>nivel(d,'A').deducible!==nivel(base,'A').deducible],
  ['Tabulador médico',d=>html(d.tabulador),d=>d.tabulador!==base.tabulador],
  ...(compararAlta?[[ 'Alta Tecnología',d=>d.altaSolicitada?'Con cobertura':'Sin cobertura',d=>d.altaSolicitada!==base.altaSolicitada]]:[]),
  ['Acceso hospitalario',d=>html(d.acceso)],['Folio GNP',d=>html(d.folio)],['Válida hasta',d=>html(d.vence)]
 ])}
-${compararAlta?'<div class="difference"><b>Diferencia anual por Alta Tecnología:</b> '+cambioPrima(ds[1])+'</div>'+alcanceAlta:`<div class="strip"><h3>Si cambia el deducible</h3><p>Cambia la cantidad inicial que asumes en una enfermedad cubierta. Un deducible mayor puede reducir la prima, pero el precio mostrado es el que cotizó GNP.</p></div>
+${compararAlta?'<div class="difference"><b>Diferencia anual por Alta Tecnología:</b> '+cambioPrima(ds[1])+'</div>':`<div class="strip"><h3>Si cambia el deducible</h3><p>Cambia la cantidad inicial que asumes en una enfermedad cubierta. Un deducible mayor puede reducir la prima, pero el precio mostrado es el que cotizó GNP.</p></div>
 <div class="strip"><h3>Si cambia el tabulador médico</h3><p>Cambian los límites de honorarios médicos reconocidos por GNP. No es el nivel hospitalario A–D. Confirma si los honorarios de tu médico están dentro del tabulador elegido.</p></div>`}<p class="small">Las primas anuales incluyen los conceptos reflejados en cada PDF original de GNP. Ninguna opción se presenta como la mejor para todos: revisa tu presupuesto y médicos de preferencia.</p>${pie(2)}</section>
 <section class="page participation">${encabezado}<div class="eyebrow">03 / CUÁNTO PARTICIPARÍAS AL USAR TU SEGURO</div><h1>${compararAlta?'Tu deducible y coaseguro<br>se mantienen.':'El mismo gasto,<br>distintas participaciones.'}</h1><p>Ejemplo con <b>${precio(gasto)}</b> de gastos cubiertos y reconocidos en cada opción.</p><p class="small"><b>Tu participación = deducible + coaseguro.</b> El coaseguro se calcula sobre el gasto restante y se limita al tope del nivel hospitalario.</p>${ejemplo('A')}${ejemplo('B')}
 <p class="difference">${compararAlta?'Este ejemplo calcula únicamente deducible y coaseguro sobre el mismo gasto reconocido; no cuantifica una participación adicional por Alta Tecnología. Su aplicación y alcance se revisan con GNP.':'Si solo cambia el tabulador y la tabla de deducible y coaseguro es igual, este ejemplo muestra la misma participación. La diferencia de honorarios médicos se revisa aparte con el médico y GNP.'}</p><p class="small">Ejemplo para una enfermedad cubierta, sin deducible previamente pagado. Considera gastos reconocidos; diferencias de honorarios y gastos no cubiertos se pagan aparte. La prima anual es el precio del seguro y no está incluida en la participación de este ejemplo. Aplican condiciones de GNP.</p>${pie(3)}</section>

@@ -39,8 +39,9 @@ function crearVista(d) {
     destacados.push('<div class="keybenefit"><h3>Cero deducible por accidente</h3><p>En accidente cubierto no pagas deducible.</p></div>');
   }
   v.altaHtml='';
+  v.altaBeneficioHtml='';
   if(d.altaSolicitada || d.altaConfirmada) {
-    destacados.push('<div class="keybenefit"><h3>Alta Tecnología y Medicina de Vanguardia</h3><p>Evita la participación adicional en determinados procedimientos e insumos especializados.</p></div>');
+    v.altaBeneficioHtml=require('./alta-tecnologia.cjs').bloqueAlta({verificada:d.altaConfirmada||d.altaVerificadaEnPortal===true});
     v.altaHtml='<b>Alta Tecnología y Medicina de Vanguardia:</b> evita una participación adicional en cirugía robótica, determinados equipos neurológicos, implantes de válvula aórtica y prótesis especiales. Siguen aplicando deducible, coaseguro, límites y condiciones.';
   }
   if(destacados.length) v.beneficiosHtml='<div class="keybenefits">'+destacados.join('')+'</div>';
