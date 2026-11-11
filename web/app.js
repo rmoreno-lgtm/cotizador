@@ -1,9 +1,13 @@
 const $=id=>document.getElementById(id);
 function aviso(texto){$('aviso').className='notice';$('aviso').textContent=texto;}
 async function api(url,options={}) {
-  const r=await fetch(url,options);
-  if(r.status===401){location.assign('/login');throw new Error('Inicia sesión.');}
-  const data=await r.json();if(!r.ok)throw new Error(data.error||'No se pudo completar la solicitud.');return data;
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);
+  try{
+    let r;try{r=await fetch(url,{...options,signal:controller.signal});}catch(e){throw new Error(options.method==='POST'?'No se confirmó la respuesta del servidor. Revisa «Mis solicitudes» antes de reintentar.':'No se pudo conectar con el servidor. Comprueba tu conexión e intenta de nuevo.');}
+    if(r.status===401){location.assign('/login');throw new Error('Inicia sesión.');}
+    let data;try{data=await r.json();}catch{throw new Error('El servidor no devolvió una respuesta válida. Revisa «Mis solicitudes» antes de reintentar.');}
+    if(!r.ok)throw new Error(data.error||'No se pudo completar la solicitud.');return data;
+  }finally{clearTimeout(timer);}
 }
 function opciones(id,values,preferida) {
   $(id).replaceChildren(...values.map(v=>new Option(id==='deducible'?'$'+Number(v).toLocaleString('es-MX'):v,v)));
@@ -25,6 +29,7 @@ function familiares() {
 }
 let configComparativo;
 function opcionesComparativo() {
+  if(!configComparativo)return;
   const prev=[...$('opciones-comparativo').children].map(e=>[...e.querySelectorAll('select')].map(s=>s.value));
   $('opciones-comparativo').replaceChildren();
   for(let i=0;i<Number($('cantidad-opciones').value);i++) {
@@ -137,19 +142,39 @@ $('siguiente').onclick=()=>{if(paginaHistorial<paginasHistorial){paginaHistorial
 $('cantidad').onchange=familiares;
 $('metodo').onchange=()=>{$('pdf-label').hidden=$('metodo').value!=='pdf';$('pdf').required=$('metodo').value==='pdf';};
 $('logo-form').onsubmit=async e=>{e.preventDefault();const f=new FormData();f.append('logo',$('logo').files[0]);try{await api('/api/logo',{method:'POST',body:f});aviso('Logo guardado. Ya puedes generar propuestas.');await cargarConfig();}catch(e){aviso(e.message);}};
-$('cotizacion').onsubmit=async e=>{
-  e.preventDefault();const s=datos();
+let enviando=false,revision;
+const estadoEnvio=texto=>{$('gmm-envio-estado').textContent=texto;};
+function cerrarRevision(){revision=undefined;$('gmm-revision').hidden=true;}
+function revisarSolicitud(){
+  const s=datos();
   const comparacion=s.opciones?'\nComparativo:\n'+s.opciones.map((o,i)=>`Opción ${i+1}: deducible $${Number(o.deducible).toLocaleString('es-MX')}, tabulador ${o.tabulador}`).join('\n'):'';
-  const resumen=`${s.nombre}${comparacion}\nTitular: ${s.edad} años, ${s.genero}, CP ${s.cp}\nFamiliares: ${s.familiares.map(f=>f.edad+' años, '+f.genero).join('; ')||'ninguno'}\n${s.opciones?'Acceso '+s.acceso:'Tabulador '+s.tabulador+', deducible $'+Number(s.deducible).toLocaleString('es-MX')+', acceso '+s.acceso}\nAlta Tecnología: ${s.alta?'sí':'no'}\nSolidez Familiar: ${s.familiares.length>=3?'solicitar':'no aplicar'}\n\n¿Confirmas la solicitud?`;
-  if(!confirm(resumen))return;
-  $('enviar').disabled=true;
+  $('gmm-resumen').textContent=`${s.nombre}${comparacion}\nTitular: ${s.edad} años, ${s.genero}, CP ${s.cp}\nFamiliares: ${s.familiares.map(f=>f.edad+' años, '+f.genero).join('; ')||'ninguno'}\n${s.opciones?'Acceso '+s.acceso:'Tabulador '+s.tabulador+', deducible $'+Number(s.deducible).toLocaleString('es-MX')+', acceso '+s.acceso}\nAlta Tecnología: ${s.alta?'sí':'no'}\nSolidez Familiar: ${s.familiares.length>=3?'solicitar':'no aplicar'}`;
+  const clave=revision&&JSON.stringify(revision.solicitud)===JSON.stringify(s)&&revision.metodo===$('metodo').value&&revision.pdf===$('pdf').files[0]?revision.clave:undefined;
+  revision={solicitud:s,metodo:$('metodo').value,pdf:$('pdf').files[0],clave};
+  $('gmm-confirmar').textContent=revision.metodo==='pdf'?'Confirmar y generar propuesta':'Confirmar y cotizar';
+  $('gmm-revision').hidden=false;estadoEnvio('Revisa los datos y pulsa «'+$('gmm-confirmar').textContent+'».');
+  $('gmm-revision-titulo').focus();$('gmm-revision').scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+$('cotizacion').addEventListener('invalid',e=>{estadoEnvio('Revisa el campo «'+(e.target.closest('label')?.firstChild?.textContent.trim()||'dato requerido')+'»: '+e.target.validationMessage);},true);
+$('cotizacion').onsubmit=e=>{e.preventDefault();if(enviando)return;try{revisarSolicitud();}catch(e){estadoEnvio('No se pudo preparar la solicitud: '+e.message);}};
+$('gmm-cancelar').onclick=()=>{cerrarRevision();estadoEnvio('Puedes corregir los datos y volver a revisar la solicitud.');$('enviar').focus();};
+$('gmm-confirmar').onclick=async()=>{
+  if(enviando||!revision)return;
+  if(!$('cotizacion').reportValidity())return;
+  if(JSON.stringify(datos())!==JSON.stringify(revision.solicitud)||$('metodo').value!==revision.metodo||$('pdf').files[0]!==revision.pdf){revisarSolicitud();estadoEnvio('Los datos cambiaron. Revisa y confirma la solicitud actualizada.');return;}
+  enviando=true;$('enviar').disabled=true;$('gmm-confirmar').disabled=true;$('gmm-cancelar').disabled=true;
+  estadoEnvio('Enviando solicitud… Espera la confirmación antes de volver a enviarla.');
   try{
-    const options={method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()}};
+    const s=revision.solicitud,options={method:'POST',headers:{'Idempotency-Key':revision.clave||(revision.clave=crypto.randomUUID())}};
     let endpoint='/api/jobs';
-    if($('metodo').value==='pdf'){const f=new FormData();f.append('solicitud',JSON.stringify(s));f.append('pdf',$('pdf').files[0]);options.body=f;endpoint='/api/pdf';}
+    if(revision.metodo==='pdf'){const f=new FormData();f.append('solicitud',JSON.stringify(s));f.append('pdf',revision.pdf);options.body=f;endpoint='/api/pdf';}
     else{options.headers['Content-Type']='application/json';options.body=JSON.stringify(s);}
-    await api(endpoint,options);paginaHistorial=1;$('buscar').value='';$('estado').value='';aviso('Solicitud recibida. Puedes seguir su avance y descargar los documentos aquí.');await refrescar();
-  }catch(e){aviso(e.message);}finally{$('enviar').disabled=false;}
+    await api(endpoint,options);cerrarRevision();paginaHistorial=1;$('buscar').value='';$('estado').value='';
+    const mensaje='Solicitud recibida. Sigue su avance en «Mis solicitudes»; ahí aparecerán los documentos o el motivo de cualquier error.';estadoEnvio(mensaje);aviso(mensaje);await refrescar();
+  }catch(e){estadoEnvio('No se pudo enviar: '+e.message);aviso(e.message);}finally{enviando=false;$('enviar').disabled=false;$('gmm-confirmar').disabled=false;$('gmm-cancelar').disabled=false;}
 };
+$('gmm-recargar').onclick=()=>iniciarGmm();
 async function cargarConfig(){const c=await api('/api/config');configComparativo=c;opciones('deducible',c.deducibles,'32000');opciones('tabulador',c.tabuladores,'D');opciones('acceso',c.accesos,'Amplio');$('config-text').textContent=(c.logo?'Logo cargado. ':'Falta cargar el logo. ')+(c.gnpConfigurado?'Credenciales de GNP configuradas; el acceso se comprobará al cotizar.':'Faltan las credenciales de GNP; puedes probar con un PDF existente.')+' '+c.nota;if(!c.logo)$('configuracion').open=true;}
-(async()=>{try{await cargarConfig();familiares();await refrescar();setInterval(refrescar,5000);}catch(e){aviso(e.message);}})();
+let historialIniciado=false;
+async function iniciarGmm(){ $('enviar').disabled=true;$('gmm-recargar').hidden=true;try{await cargarConfig();familiares();if($('modalidad').value==='comparativo')opcionesComparativo();$('enviar').disabled=false;estadoEnvio('Completa los datos y pulsa «Revisar y enviar solicitud».');if(!historialIniciado){historialIniciado=true;await refrescar();setInterval(refrescar,5000);}}catch(e){estadoEnvio('No se pudieron cargar las opciones: '+e.message);$('gmm-recargar').hidden=false;aviso(e.message);}}
+iniciarGmm();

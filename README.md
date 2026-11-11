@@ -222,3 +222,11 @@ La portada presenta el total de aportaciones programadas, el ahorro fiscal supue
 En la tabla se indica el primer año sin aportaciones programadas, según el calendario real de la ilustración. El último renglón mantiene su fondo verde y solo la recuperación proyectada se encierra en un círculo; la protección conserva su cifra sin círculo.
 
 «Personalizar el título del plan» ofrece sugerencias para Retiro personal, Independencia, Personas importantes y Patrimonio, con título y subtítulo editables. Los cambios se guardan en el borrador con `PATCH /api/ppr/:id/textos`; se validan sus longitudes, se escapan al presentar y se aplican también antes de descargar. Los campos vacíos recuperan la sugerencia del enfoque. Son cambios editoriales: no modifican cifras, coberturas ni cálculos fiscales, y no requieren un proveedor de IA.
+
+### Envío de Gastos Médicos
+
+La revisión previa al envío aparece dentro del formulario, sin depender de ventanas `confirm()` del navegador. El asesor confirma los datos con «Confirmar y cotizar» o «Confirmar y generar propuesta». Si modifica los datos después de revisarlos, se muestra el resumen actualizado y debe confirmarlo de nuevo. El envío indica su estado junto al botón y evita peticiones simultáneas; los errores de campos, configuración o servidor quedan visibles.
+
+Las opciones se cargan antes de habilitar el envío. Si falla la configuración, puede volver a cargarla desde el formulario. Las peticiones tienen un límite de espera de 30 segundos; si no se confirma la respuesta de un envío, se indica revisar el historial antes de reintentar. El reintento de la misma revisión conserva su identificador de idempotencia para evitar duplicados en el servidor.
+
+Prueba de navegador, sin acceso real a GNP: `CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium node test/browser/gmm.cjs` (omitir la variable si Playwright ya tiene su Chromium instalado). Cubre validación, revisión sin diálogos, cambios antes de confirmar, errores visibles, envío, comparativos, recuperación de configuración y ancho móvil. Las peticiones de cotización se simulan; esta prueba no verifica credenciales ni disponibilidad del portal GNP.
