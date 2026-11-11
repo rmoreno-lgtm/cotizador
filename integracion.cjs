@@ -24,14 +24,14 @@ function crearVista(d) {
     ['Deducible','$'+dinero(a.deducible),'$'+dinero(b.deducible)],
     ['Base después del deducible','$'+dinero(a.base),'$'+dinero(b.base)],
     ['Coaseguro',`${A.porcentaje}%: $${dinero(a.coaseguro)}`,`${B.porcentaje}%: $${dinero(b.coaseguro)}`],
-    ['<b>Tu participación</b>',`<b>$${dinero(a.total)}</b>`,`<b>$${dinero(b.total)}</b>`]
+    ['<b>Tu participación total</b>',`<b>$${dinero(a.total)}</b>`,`<b>$${dinero(b.total)}</b>`]
   ];
   const diferencia=a.total-b.total;
   const frase=diferencia>0?`$${dinero(diferencia)} menos de participación en nivel B.`:diferencia<0?`$${dinero(-diferencia)} más de participación en nivel B.`:'la misma participación en ambos niveles.';
-  v.comparacionHtml=`<div class="example comparison"><b>MISMO GASTO, DISTINTA PARTICIPACIÓN</b><p class="small">Ejemplo con $${dinero(gasto)} de gastos cubiertos y reconocidos.</p><table><tr><th>Concepto</th><th>Nivel A</th><th>Nivel B</th></tr>${filas.map(f=>'<tr>'+f.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')}</table><p class="difference"><b>En este ejemplo: ${frase}</b></p></div>`;
+  v.comparacionHtml=`<div class="example comparison"><b>MISMO GASTO, DISTINTA PARTICIPACIÓN</b><p class="small">Ejemplo con $${dinero(gasto)} de gastos cubiertos y reconocidos.</p><table><tr><th>Concepto</th><th>Nivel A</th><th>Nivel B</th></tr>${filas.map((f,i)=>'<tr'+(i===filas.length-1?' class="total-participacion"':'')+'>'+f.map(c=>'<td>'+c+'</td>').join('')+'</tr>').join('')}</table><p class="difference participacion-diferencia"><b>En este ejemplo: ${frase}</b></p></div>`;
   const textoCoaseguro=a.bruto>A.tope || b.bruto>B.tope?' En esta comparación, el coaseguro se limita al tope cuando corresponde.':'';
   v.comparacionHtml=v.comparacionHtml.replace('reconocidos.</p>',`reconocidos.${textoCoaseguro}</p>`);
-  v.topeHtml=`<div class="example"><b>EJEMPLO 2 · CUANDO SE ALCANZA EL TOPE, NIVEL A</b><table><tr><td>Gastos cubiertos</td><td class="amount">$${dinero(gastoTope)}</td></tr><tr><td>Coaseguro calculado: ${A.porcentaje}% × $${dinero(tope.base)}</td><td class="amount">$${dinero(tope.bruto)}</td></tr><tr><td>Coaseguro limitado al tope de este nivel</td><td class="amount">$${dinero(tope.coaseguro)}</td></tr><tr><td><b>Deducible $${dinero(tope.deducible)} + coaseguro $${dinero(tope.coaseguro)}</b></td><td class="amount"><b>$${dinero(tope.total)}</b></td></tr></table></div>`;
+  v.topeHtml=`<div class="example"><b>EJEMPLO 2 · CUANDO SE ALCANZA EL TOPE, NIVEL A</b><table><tr><td>Gastos cubiertos</td><td class="amount">$${dinero(gastoTope)}</td></tr><tr><td>Coaseguro calculado: ${A.porcentaje}% × $${dinero(tope.base)}</td><td class="amount">$${dinero(tope.bruto)}</td></tr><tr><td>Coaseguro limitado al tope de este nivel</td><td class="amount">$${dinero(tope.coaseguro)}</td></tr><tr class="total-participacion"><td><b>Tu participación total</b><br><span class="participacion-formula">Deducible $${dinero(tope.deducible)} + coaseguro $${dinero(tope.coaseguro)}</span></td><td class="amount"><b>$${dinero(tope.total)}</b></td></tr></table></div>`;
   v.adicionalesHtml=d.coberturas.length?d.coberturas.map(c=>'• '+html(c)+'.').join('<br>'):'El PDF no describe expresamente adicionales de esta lista; consulta el documento original.';
   v.beneficiosHtml = '';
   const destacados=[];
