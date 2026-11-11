@@ -1,0 +1,10 @@
+/* Jerarquía común para el resultado del ejemplo, sin cambiar su cálculo. */
+.total-participacion td{background:#0a3052;color:#fff;border-top:3px solid #ef8924;padding:9px 8px!important;font-weight:800;vertical-align:middle}
+.total-participacion td:first-child{font-size:12px;line-height:1.35}
+.total-participacion td:not(:first-child){font-size:18px;line-height:1.2;white-space:nowrap;font-variant-numeric:tabular-nums}
+.example .total-participacion b{font-size:inherit;color:inherit}
+.referencia-participacion td{background:#e5eff8;color:#0a3052;padding:8px!important;border-bottom:2px solid #ef8924;font-size:12px;font-weight:700;line-height:1.35}
+.referencia-participacion td:not(:first-child){font-size:13px;font-variant-numeric:tabular-nums}
+.participacion-diferencia{background:#fff0dc;color:#743000;border-left:5px solid #e97513;padding:10px 12px;font-size:13px;line-height:1.45}
+.example .participacion-diferencia b{font-size:13px}
+.total-participacion .participacion-formula{font-size:10px;line-height:1.4;color:#d9e8f3;font-weight:400}

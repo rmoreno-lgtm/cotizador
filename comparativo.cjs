@@ -33,7 +33,7 @@ function documentoComparativo(logo,qr,{opciones:ds,compararAlta=false}) {
   const estilo=require('node:fs').readFileSync(path.join(__dirname,'comparativo-estilo.css'),'utf8');
   const encabezado=`<header><img class="logo" src="${logo}" alt="QUILLUM Seguros y Fianzas"><div class="insurer">PROPUESTA COMPARATIVA<br><b>Aseguradora: GNP</b><br>Seguro Médico ${html(base.plan)}</div></header>`;
   const pie=n=>`<footer>QUILLUM · Folios GNP ${ds.map(d=>html(d.folio)).join(' / ')} · Propuesta informativa<span>${n} / 4</span></footer>`;
-  const tabla=filas=>`<table class="compare-table"><thead><tr><th>Concepto</th>${ds.map((_,i)=>'<th>Opción '+(i+1)+'</th>').join('')}</tr></thead><tbody>${filas.map(([titulo,fn,resaltar])=>`<tr${titulo==='Tu participación total'?' class="total-participacion"':''}><td>`+titulo+'</td>'+ds.map((d,i)=>`<td${i&&resaltar&&resaltar(d)?' class="changed"':''}>`+fn(d)+'</td>').join('')+'</tr>').join('')}</tbody></table>`;
+  const tabla=filas=>`<table class="compare-table"><thead><tr><th>Concepto</th>${ds.map((_,i)=>'<th>Opción '+(i+1)+'</th>').join('')}</tr></thead><tbody>${filas.map(([titulo,fn,resaltar])=>`<tr${titulo==='Tu participación total'?' class="total-participacion"':titulo==='Frente a opción 1'?' class="referencia-participacion"':''}><td>`+titulo+'</td>'+ds.map((d,i)=>`<td${i&&resaltar&&resaltar(d)?' class="changed"':''}>`+fn(d)+'</td>').join('')+'</tr>').join('')}</tbody></table>`;
   const cambioPrima=d=>{
     const delta=d.monto.total-base.monto.total;
     return delta===0?'Misma prima anual que opción 1.':`${precio(Math.abs(delta))} ${delta<0?'menos':'más'} al año que opción 1.`;
@@ -57,7 +57,8 @@ function documentoComparativo(logo,qr,{opciones:ds,compararAlta=false}) {
     ['Frente a opción 1',d=>d===base?'Referencia':diferenciaParticipacion(d,n)]
   ]);
   return `<!doctype html><html lang="es"><meta charset="utf-8"><title>Comparativo QUILLUM</title><style>${estilo}
-${require('./alta-tecnologia.cjs').estilo}</style><body>
+${require('./alta-tecnologia.cjs').estilo}
+${require('node:fs').readFileSync(path.join(__dirname,'participacion.css'),'utf8')}</style><body>
 <section class="page">${encabezado}<div class="eyebrow">01 / PROTECCIÓN Y ACOMPAÑAMIENTO</div>
 <h1>Tu protección médica,<br>con el respaldo de QUILLUM.</h1><p>Preparada para <b>${html(base.nombre)}</b>.<br>${v.perfilHtml}</p>
 ${v.beneficiosHtml}

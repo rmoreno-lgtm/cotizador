@@ -60,6 +60,7 @@ footer span { float:right; }
 .asistencias .card { border-top:3px solid #ef8924; }
 .asistencias h3 { color:#104b74; font-size:13px; }
 ${require('./alta-tecnologia.cjs').estilo}
+${require('node:fs').readFileSync(path.join(__dirname,'participacion.css'),'utf8')}
 </style>
 <section class="page${alta?' alta-portada':''}">${header}
 <div class="eyebrow">01 / PROTECCIÓN Y ACOMPAÑAMIENTO</div>
