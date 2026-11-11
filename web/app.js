@@ -21,7 +21,7 @@ function familiares() {
     const titulo=document.createElement('h3');titulo.textContent='Familiar '+(i+1);div.append(titulo);
     const campos=document.createElement('div');campos.className='fields';
     const edad=document.createElement('input');edad.type='number';edad.min='0';edad.max='120';edad.step='1';edad.required=true;edad.value=previo[i]?.edad||'';
-    const genero=document.createElement('select');genero.append(new Option('Masculino'),new Option('Femenino'));genero.value=previo[i]?.genero||'Masculino';
+    const genero=document.createElement('select');genero.required=true;genero.append(new Option('Selecciona el género',''),new Option('Masculino'),new Option('Femenino'));genero.value=previo[i]?.genero||'';
     for(const [texto,control] of [['Edad',edad],['Género',genero]]){const l=document.createElement('label');l.textContent=texto;l.append(control);campos.append(l);}
     div.append(campos);$('familiares').append(div);
   }
@@ -96,7 +96,7 @@ async function refrescar() {
     const elementos=[];
     for(const j of resultado.items) {
       const div=document.createElement('article');div.className='job';
-      const h=document.createElement('h3');h.textContent=j.nombre;div.append(h);
+      const h=document.createElement('h3');h.textContent='Cliente / referencia: '+j.nombre;div.append(h);
       const estado=document.createElement('span');estado.className='estado estado-'+j.estado;
       estado.textContent=({pendiente:'En cola',procesando:'Procesando',completada:'Completada',error:'Requiere revisión'})[j.estado];div.append(estado);
       const n=1+(j.solicitud?.familiares?.length||0);
