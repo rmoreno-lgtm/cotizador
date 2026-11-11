@@ -1,0 +1,16 @@
+.alta-beneficio{margin:12px 0;border:1px solid #d6e2ec;border-radius:10px;overflow:hidden;break-inside:avoid;background:#fff}
+.alta-beneficio .alta-encabezado{background:#0a3052;color:#fff;padding:10px 13px;border-left:5px solid #ef8924}
+.alta-encabezado>span{font-size:8px;letter-spacing:.8px;color:#ffbf80;font-weight:bold}
+.alta-beneficio h2{margin:4px 0;font-size:17px;line-height:1.2;color:#fff}
+.alta-beneficio .alta-encabezado p{margin:0;color:#fff;font-size:10px;line-height:1.35}
+.alta-puntos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:10px 13px;background:#f0f5f9}
+.alta-puntos>div{display:grid;grid-template-columns:30px 1fr;gap:3px 7px;align-content:start}
+.alta-puntos svg{grid-row:span 2;width:30px;height:30px;color:#e97513}
+.alta-puntos b{font-size:10px;line-height:1.3}.alta-beneficio .alta-puntos p{font-size:9px;line-height:1.3;margin:0}
+.alta-comparacion{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.alta-comparacion>div{padding:9px 13px}.alta-comparacion>div:last-child{background:#fff2e5;border-left:1px solid #e9d6c4}
+.alta-comparacion b{font-size:11px}.alta-beneficio .alta-comparacion p{font-size:10px;line-height:1.35;margin:4px 0 0}.alta-comparacion strong{color:#0a3052}
+.alta-beneficio .alta-condiciones{font-size:8px;line-height:1.35;margin:0;padding:7px 13px;border-top:1px solid #e2e9ef;color:#52667b}
+.alta-portada header{height:84px}.alta-portada .eyebrow{margin:12px 0 7px}.alta-portada h1{font-size:25px;margin:8px 0}.alta-portada .card{padding:10px}.alta-portada .asistencias .card p{font-size:10px;line-height:1.35}.alta-portada h2:not(.alta-beneficio h2){margin:12px 0 7px}.alta-portada .hero{padding:12px 16px;margin:12px 0 7px}.alta-portada .hero strong{font-size:29px}.alta-portada .small{font-size:9px;line-height:1.35}
+.alta-configuracion .eyebrow{margin:12px 0 7px}.alta-configuracion h1{font-size:25px;margin:8px 0}.alta-configuracion .options{margin:10px 0}.alta-configuracion .option{padding:10px}.alta-configuracion .compare-table td,.alta-configuracion .compare-table th{padding:6px}.alta-configuracion .alta-beneficio{margin:10px 0}
+.alta-configuracion header{height:84px}.alta-configuracion .strip{padding:8px 12px;margin-top:10px}.alta-configuracion .strip p{font-size:10px;line-height:1.4}.alta-configuracion>.small{font-size:9px;line-height:1.35}

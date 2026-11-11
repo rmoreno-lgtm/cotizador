@@ -81,3 +81,13 @@ test('cotiza con y sin Alta Tecnología en una sesión y exige verificación ant
  verificar=false;await assert.rejects(ejecutarComparativo({id:'alta',solicitud:s},dir,deps),/No se verificaron/);assert.equal(generados,2);
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
+test('Alta Tecnología destaca solo cuando corresponde, conserva precios y distingue solicitud pendiente',()=>{
+ const {crearVista}=require('../integracion.cjs'),{documento}=require('../propuesta.cjs');
+ const sin=datos(base),con={...sin,altaSolicitada:true,altaConfirmada:true};const original=JSON.stringify(con);
+ assert.equal(crearVista(sin).altaBeneficioHtml,'');const v=crearVista(con);assert.match(v.altaBeneficioHtml,/Tecnología robótica/);assert.match(v.altaBeneficioHtml,/TAVI\/TAVR/);assert.match(v.altaBeneficioHtml,/Prótesis especializadas/);assert.match(v.altaBeneficioHtml,/50%/);assert.match(v.altaBeneficioHtml,/Se mantienen el deducible y coaseguro contratados/);assert.match(v.altaBeneficioHtml,/terapia génica conservan sus umbrales/);
+ const individual=documento('logo','qr',v);assert.equal((individual.match(/class="alta-beneficio"/g)||[]).length,1);assert.ok(individual.indexOf('class="alta-beneficio"')<individual.indexOf('INVERSIÓN ANUAL TOTAL'));assert.equal((individual.match(/<section class="page/g)||[]).length,3);assert.equal(v.total,crearVista(sin).total);assert.equal(JSON.stringify(con),original);
+ assert.match(crearVista({...con,altaConfirmada:false,altaVerificadaEnPortal:false}).altaBeneficioHtml,/CONFIRMA SU INCLUSIÓN/);
+ const comparativo=documentoComparativo('logo','qr',{opciones:[sin,con],compararAlta:true});assert.equal((comparativo.match(/class="alta-beneficio"/g)||[]).length,1);assert.ok(comparativo.indexOf('class="alta-beneficio"')<comparativo.indexOf('OPCIÓN 1'));assert.ok(comparativo.indexOf('class="alta-beneficio"')>comparativo.indexOf('02 / ELIGE'));assert.equal((comparativo.match(/<section class="page/g)||[]).length,4);
+ assert.ok(!documentoComparativo('logo','qr',{opciones:[sin,{...sin,tabulador:'B'}]}).includes('class="alta-beneficio"'));
+ assert.ok(documentoComparativo('logo','qr',{opciones:[con,{...con,tabulador:'B'}]}).includes('class="alta-beneficio"'));
+});
