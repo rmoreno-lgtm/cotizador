@@ -3,11 +3,15 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {dinero,calculo,leerPdf}=require('./leer-gnp.cjs');
 const {html}=require('./integracion.cjs');
-function validarComparacion(datos) {
+function validarComparacion(datos,compararAlta=false) {
   if(datos.length<2 || datos.length>3)throw new Error('Se requieren dos o tres cotizaciones verificadas.');
   const base=datos[0];
+  if(compararAlta){
+    if(datos.length!==2||base.altaSolicitada!==false||datos[1].altaSolicitada!==true||base.altaConfirmada||base.altaVerificadaEnPortal===true||!(datos[1].altaConfirmada||datos[1].altaVerificadaEnPortal===true))throw new Error('No se verificaron las dos opciones sin y con Alta Tecnología. Requieren revisión.');
+    if(datos[1].tabulador!==base.tabulador||JSON.stringify(datos[1].niveles)!==JSON.stringify(base.niveles))throw new Error('El comparativo de Alta Tecnología debe conservar el mismo tabulador y tabla hospitalaria.');
+  }
   for(const d of datos) {
-    if(JSON.stringify(d.asegurados)!==JSON.stringify(base.asegurados) || d.nombre!==base.nombre || d.plan!==base.plan || d.acceso!==base.acceso || d.suma!==base.suma || d.altaSolicitada!==base.altaSolicitada || d.solidezSolicitada!==base.solidezSolicitada || JSON.stringify(d.coberturas)!==JSON.stringify(base.coberturas) || JSON.stringify(d.asistencias)!==JSON.stringify(base.asistencias) || d.altaConfirmada!==base.altaConfirmada)throw new Error('Las cotizaciones no tienen el mismo perfil y coberturas comunes. Requieren revisión.');
+    if(JSON.stringify(d.asegurados)!==JSON.stringify(base.asegurados) || d.nombre!==base.nombre || d.plan!==base.plan || d.acceso!==base.acceso || d.suma!==base.suma || (!compararAlta && d.altaSolicitada!==base.altaSolicitada) || d.solidezSolicitada!==base.solidezSolicitada || JSON.stringify(d.coberturas)!==JSON.stringify(base.coberturas) || JSON.stringify(d.asistencias)!==JSON.stringify(base.asistencias) || (!compararAlta && d.altaConfirmada!==base.altaConfirmada))throw new Error('Las cotizaciones no tienen el mismo perfil y coberturas comunes. Requieren revisión.');
     if(!d.niveles.some(n=>n.nivel==='A') || !d.niveles.some(n=>n.nivel==='B'))throw new Error('Faltan niveles hospitalarios para comparar.');
   }
 }
@@ -15,12 +19,15 @@ function cambiosOpcion(base,d) {
   const diferencias=[];
   if(d.niveles.find(n=>n.nivel==='A').deducible!==base.niveles.find(n=>n.nivel==='A').deducible)diferencias.push('deducible');
   if(d.tabulador!==base.tabulador)diferencias.push('tabulador médico');
+  if(d.altaSolicitada!==base.altaSolicitada)diferencias.push('Alta Tecnología');
   return diferencias;
 }
-function documentoComparativo(logo,qr,{opciones:ds}) {
-  validarComparacion(ds);
+function documentoComparativo(logo,qr,{opciones:ds,compararAlta=false}) {
+  validarComparacion(ds,compararAlta);
   const {crearVista}=require('./integracion.cjs');
   const base=ds[0],v=crearVista(base),precio=x=>'$'+dinero(x,true),nivel=(d,n)=>d.niveles.find(x=>x.nivel===n);
+  const altaTexto=compararAlta?crearVista(ds[1]).altaHtml:'';
+  const alcanceAlta='<div class="strip"><h3>¿Qué cambia con Alta Tecnología?</h3><p><b>Sin la cobertura:</b> puede aplicar una participación adicional en determinados procedimientos e insumos especializados. <b>Con la cobertura:</b> se evita esa participación adicional conforme a las condiciones de GNP. Siguen aplicando deducible, coaseguro, límites y exclusiones.</p></div>';
   const estilo=require('node:fs').readFileSync(path.join(__dirname,'comparativo-estilo.css'),'utf8');
   const encabezado=`<header><img class="logo" src="${logo}" alt="QUILLUM Seguros y Fianzas"><div class="insurer">PROPUESTA COMPARATIVA<br><b>Aseguradora: GNP</b><br>Seguro Médico ${html(base.plan)}</div></header>`;
   const pie=n=>`<footer>QUILLUM · Folios GNP ${ds.map(d=>html(d.folio)).join(' / ')} · Propuesta informativa<span>${n} / 4</span></footer>`;
@@ -31,7 +38,7 @@ function documentoComparativo(logo,qr,{opciones:ds}) {
   };
   const tarjetas=ds.map((d,i)=>{
     const cambios=cambiosOpcion(base,d);
-    const etiqueta=i===0?'Opción de referencia':cambios.length?'Cambia '+cambios.join(' y '):'Mismo deducible y tabulador';
+    const etiqueta=compararAlta?(d.altaSolicitada?'Con Alta Tecnología':'Sin Alta Tecnología'):i===0?'Opción de referencia':cambios.length?'Cambia '+cambios.join(' y '):'Mismo deducible y tabulador';
     return `<div class="option"><h3>OPCIÓN ${i+1}</h3><span class="change">${etiqueta}</span><strong>${precio(d.monto.total)}</strong><p>Inversión anual total · MXN</p><p><b>Deducible base:</b> ${precio(nivel(d,'A').deducible)}<br><b>Tabulador médico:</b> ${html(d.tabulador)}</p>${i?'<p>'+cambioPrima(d)+'</p>':'<p>Las diferencias de las otras opciones se muestran respecto a esta configuración.</p>'}</div>`;
   }).join('');
   const gasto=Math.max(20000000,...ds.flatMap(d=>['A','B'].map(n=>nivel(d,n).deducible+10000000)));
@@ -51,21 +58,22 @@ function documentoComparativo(logo,qr,{opciones:ds}) {
 <section class="page">${encabezado}<div class="eyebrow">01 / PROTECCIÓN Y ACOMPAÑAMIENTO</div>
 <h1>Tu protección médica,<br>con el respaldo de QUILLUM.</h1><p>Preparada para <b>${html(base.nombre)}</b>.<br>${v.perfilHtml}</p>
 ${v.beneficiosHtml}
-<div class="row"><div class="card"><h3>Suma asegurada básica</h3><strong>${precio(base.suma)}</strong><p>Por año póliza, por asegurado.</p></div><div class="card"><h3>Protección en todas las opciones</h3><strong>Acceso ${html(base.acceso)}</strong><p>Mismos asegurados y coberturas comunes. Comparamos deducibles y tabuladores.</p></div></div>
+<div class="row"><div class="card"><h3>Suma asegurada básica</h3><strong>${precio(base.suma)}</strong><p>Por año póliza, por asegurado.</p></div><div class="card"><h3>Protección en todas las opciones</h3><strong>Acceso ${html(base.acceso)}</strong><p>${compararAlta?'Mismos asegurados, deducible y tabulador. Solo comparamos Alta Tecnología.':'Mismos asegurados y coberturas comunes. Comparamos deducibles y tabuladores.'}</p></div></div>
 <h2>También te acompaña en el día a día</h2><div class="row asistencias"><div class="card"><h3>Asistencia dental</h3><p>${v.dentalHtml}</p></div><div class="card"><h3>Apoyo psicológico</h3><p>${v.psicologicaHtml}</p></div><div class="card"><h3>Médica Móvil</h3><p>${v.movilHtml}</p></div></div><p class="small">Aplican condiciones, disponibilidad y alcance de cada servicio.</p>
 <div class="strip"><h3>El respaldo de QUILLUM, cuando más lo necesitas</h3><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p></div>
-<h2>Una misma protección, distintas formas de participar</h2><p>En las siguientes páginas encontrarás ${ds.length} opciones, sus diferencias de precio y ejemplos de lo que pagarías al usar tu seguro.</p>${pie(1)}</section>
-<section class="page">${encabezado}<div class="eyebrow">02 / ELIGE TU CONFIGURACIÓN</div><h1>¿Qué cambia entre tus opciones?</h1><p>Cada opción adicional se compara con la opción 1. Los campos resaltados en naranja muestran cambios.</p><div class="options">${tarjetas}</div>
+<h2>${compararAlta?'Mismo plan, con o sin Alta Tecnología':'Una misma protección, distintas formas de participar'}</h2><p>En las siguientes páginas encontrarás ${ds.length} opciones, sus diferencias de precio y ejemplos de lo que pagarías al usar tu seguro.</p>${pie(1)}</section>
+<section class="page">${encabezado}<div class="eyebrow">02 / ELIGE TU CONFIGURACIÓN</div><h1>${compararAlta?'Con o sin Alta Tecnología.':'¿Qué cambia entre tus opciones?'}</h1><p>Cada opción adicional se compara con la opción 1. Los campos resaltados en naranja muestran cambios.</p><div class="options">${tarjetas}</div>
 ${tabla([
  ['Deducible base · nivel A',d=>precio(nivel(d,'A').deducible),d=>nivel(d,'A').deducible!==nivel(base,'A').deducible],
  ['Tabulador médico',d=>html(d.tabulador),d=>d.tabulador!==base.tabulador],
+ ...(compararAlta?[[ 'Alta Tecnología',d=>d.altaSolicitada?'Con cobertura':'Sin cobertura',d=>d.altaSolicitada!==base.altaSolicitada]]:[]),
  ['Acceso hospitalario',d=>html(d.acceso)],['Folio GNP',d=>html(d.folio)],['Válida hasta',d=>html(d.vence)]
 ])}
-<div class="strip"><h3>Si cambia el deducible</h3><p>Cambia la cantidad inicial que asumes en una enfermedad cubierta. Un deducible mayor puede reducir la prima, pero el precio mostrado es el que cotizó GNP.</p></div>
-<div class="strip"><h3>Si cambia el tabulador médico</h3><p>Cambian los límites de honorarios médicos reconocidos por GNP. No es el nivel hospitalario A–D. Confirma si los honorarios de tu médico están dentro del tabulador elegido.</p></div><p class="small">Las primas anuales incluyen los conceptos reflejados en cada PDF original de GNP. Ninguna opción se presenta como la mejor para todos: revisa tu presupuesto y médicos de preferencia.</p>${pie(2)}</section>
-<section class="page participation">${encabezado}<div class="eyebrow">03 / CUÁNTO PARTICIPARÍAS AL USAR TU SEGURO</div><h1>El mismo gasto,<br>distintas participaciones.</h1><p>Ejemplo con <b>${precio(gasto)}</b> de gastos cubiertos y reconocidos en cada opción.</p><p class="small"><b>Tu participación = deducible + coaseguro.</b> El coaseguro se calcula sobre el gasto restante y se limita al tope del nivel hospitalario.</p>${ejemplo('A')}${ejemplo('B')}
-<p class="difference">Si solo cambia el tabulador y la tabla de deducible y coaseguro es igual, este ejemplo muestra la misma participación. La diferencia de honorarios médicos se revisa aparte con el médico y GNP.</p><p class="small">Ejemplo para una enfermedad cubierta, sin deducible previamente pagado. Considera gastos reconocidos; diferencias de honorarios y gastos no cubiertos se pagan aparte. La prima anual es el precio del seguro y no está incluida en la participación de este ejemplo. Aplican condiciones de GNP.</p>${pie(3)}</section>
-<section class="page">${encabezado}<div class="eyebrow">04 / TU PLAN Y EL SERVICIO DE TU DESPACHO</div><h1>Respaldo para tu salud.<br>Acompañamiento para ti.</h1><h2>Coberturas descritas en tus cotizaciones</h2><p>La cobertura básica contempla diagnóstico, honorarios médicos, hospitalización, cirugía, medicamentos y rehabilitación, conforme a condiciones y límites.</p><div class="card"><h3>Adicionales expresamente descritos por GNP</h3><p>${v.adicionalesHtml}</p></div><p class="small">${v.altaHtml}</p><h2>El respaldo de QUILLUM</h2><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p><p>Contamos con convenios con <b>Grupo Muguerza, Grupo Auna, Grupo Ángeles y Hospitaria, entre otros</b>, que nos permiten coordinar la atención y facilitar la gestión de trámites.</p><p class="small">El acceso y la cobertura están sujetos al plan contratado, al hospital y a la autorización de GNP. Los convenios del despacho no amplían la cobertura de la póliza.</p><div class="contact"><img src="${qr}" alt="QR de WhatsApp"><div><h3>Revisemos juntos tus opciones</h3><p>Escanea el QR o pulsa el número.</p><a href="https://wa.me/528180202414">81 80 20 24 14</a></div></div><p class="small">Antes de contratar, confirma hospitales, coberturas, exclusiones y periodos de espera. Conserva los originales de GNP junto con este comparativo; es informativo y no es una póliza. La aceptación, tarifa y alcance están sujetos a suscripción y condiciones contractuales.</p>${pie(4)}</section></body></html>`;
+${compararAlta?'<div class="difference"><b>Diferencia anual por Alta Tecnología:</b> '+cambioPrima(ds[1])+'</div>'+alcanceAlta:`<div class="strip"><h3>Si cambia el deducible</h3><p>Cambia la cantidad inicial que asumes en una enfermedad cubierta. Un deducible mayor puede reducir la prima, pero el precio mostrado es el que cotizó GNP.</p></div>
+<div class="strip"><h3>Si cambia el tabulador médico</h3><p>Cambian los límites de honorarios médicos reconocidos por GNP. No es el nivel hospitalario A–D. Confirma si los honorarios de tu médico están dentro del tabulador elegido.</p></div>`}<p class="small">Las primas anuales incluyen los conceptos reflejados en cada PDF original de GNP. Ninguna opción se presenta como la mejor para todos: revisa tu presupuesto y médicos de preferencia.</p>${pie(2)}</section>
+<section class="page participation">${encabezado}<div class="eyebrow">03 / CUÁNTO PARTICIPARÍAS AL USAR TU SEGURO</div><h1>${compararAlta?'Tu deducible y coaseguro<br>se mantienen.':'El mismo gasto,<br>distintas participaciones.'}</h1><p>Ejemplo con <b>${precio(gasto)}</b> de gastos cubiertos y reconocidos en cada opción.</p><p class="small"><b>Tu participación = deducible + coaseguro.</b> El coaseguro se calcula sobre el gasto restante y se limita al tope del nivel hospitalario.</p>${ejemplo('A')}${ejemplo('B')}
+<p class="difference">${compararAlta?'Este ejemplo calcula únicamente deducible y coaseguro sobre el mismo gasto reconocido; no cuantifica una participación adicional por Alta Tecnología. Su aplicación y alcance se revisan con GNP.':'Si solo cambia el tabulador y la tabla de deducible y coaseguro es igual, este ejemplo muestra la misma participación. La diferencia de honorarios médicos se revisa aparte con el médico y GNP.'}</p><p class="small">Ejemplo para una enfermedad cubierta, sin deducible previamente pagado. Considera gastos reconocidos; diferencias de honorarios y gastos no cubiertos se pagan aparte. La prima anual es el precio del seguro y no está incluida en la participación de este ejemplo. Aplican condiciones de GNP.</p>${pie(3)}</section>
+<section class="page">${encabezado}<div class="eyebrow">04 / TU PLAN Y EL SERVICIO DE TU DESPACHO</div><h1>Respaldo para tu salud.<br>Acompañamiento para ti.</h1><h2>Coberturas descritas en tus cotizaciones</h2><p>La cobertura básica contempla diagnóstico, honorarios médicos, hospitalización, cirugía, medicamentos y rehabilitación, conforme a condiciones y límites.</p><div class="card"><h3>Adicionales expresamente descritos por GNP</h3><p>${v.adicionalesHtml}</p></div><p class="small">${compararAlta?'En la opción 2 · '+altaTexto:v.altaHtml}</p>${compararAlta?alcanceAlta:''}<h2>El respaldo de QUILLUM</h2><p>Te acompañamos en la programación de cirugías, la gestión de reembolsos y el seguimiento durante tu hospitalización.</p><p>Contamos con convenios con <b>Grupo Muguerza, Grupo Auna, Grupo Ángeles y Hospitaria, entre otros</b>, que nos permiten coordinar la atención y facilitar la gestión de trámites.</p><p class="small">El acceso y la cobertura están sujetos al plan contratado, al hospital y a la autorización de GNP. Los convenios del despacho no amplían la cobertura de la póliza.</p><div class="contact"><img src="${qr}" alt="QR de WhatsApp"><div><h3>Revisemos juntos tus opciones</h3><p>Escanea el QR o pulsa el número.</p><a href="https://wa.me/528180202414">81 80 20 24 14</a></div></div><p class="small">Antes de contratar, confirma hospitales, coberturas, exclusiones y periodos de espera. Conserva los originales de GNP junto con este comparativo; es informativo y no es una póliza. La aceptación, tarifa y alcance están sujetos a suscripción y condiciones contractuales.</p>${pie(4)}</section></body></html>`;
 }
 async function ejecutarComparativo(job,dir,{env,logoPath,cotizar,crearSesion,leer,generar}={}) {
   crearSesion=crearSesion||require('./cotizador-gnp.cjs').crearSesion;leer=leer||leerPdf;generar=generar||require('./propuesta.cjs').generarPropuesta;
@@ -73,7 +81,7 @@ async function ejecutarComparativo(job,dir,{env,logoPath,cotizar,crearSesion,lee
   try {
   for(const [i,o] of job.solicitud.opciones.entries()) {
     const carpeta=path.join(dir,'opcion-'+(i+1));await fs.mkdir(carpeta,{recursive:true});
-    const pdf=path.join(carpeta,'gnp.pdf');const s={...job.solicitud,...o};delete s.opciones;delete s.modalidad;
+    const pdf=path.join(carpeta,'gnp.pdf');const s={...job.solicitud,...o};delete s.opciones;delete s.modalidad;delete s.compararAlta;
     try {
       let verificada,datosGuardados;
       try {
@@ -99,10 +107,10 @@ async function ejecutarComparativo(job,dir,{env,logoPath,cotizar,crearSesion,lee
     } catch(e){throw new Error('Opción '+(i+1)+': '+e.message+' No se generó el comparativo completo.');}
   }
   }finally{if(sesion)await sesion.cerrar();}
-  validarComparacion(resultados);
+  validarComparacion(resultados,job.solicitud.compararAlta===true);
   const nombre='QUILLUM-Comparativo-'+job.id;
-  const archivo=await generar({schemaVersion:1,folio:resultados.map(d=>d.folio).join('-'),opciones:resultados},{baseDir:dir,nombreSalida:nombre,abrir:false,logoPath,executablePath:env?.CHROMIUM_EXECUTABLE_PATH,documento:documentoComparativo});
+  const archivo=await generar({schemaVersion:1,folio:resultados.map(d=>d.folio).join('-'),opciones:resultados,compararAlta:job.solicitud.compararAlta===true},{baseDir:dir,nombreSalida:nombre,abrir:false,logoPath,executablePath:env?.CHROMIUM_EXECUTABLE_PATH,documento:documentoComparativo});
   await fs.writeFile(path.join(dir,'comparativo.verificado.json'),JSON.stringify(resultados,null,2));
-  return {propuesta:path.relative(dir,archivo),folio:resultados.map(d=>d.folio).join(' / '),advertencias:resultados.flatMap((d,i)=>d.advertencias.map(a=>'Opción '+(i+1)+': '+a)),opciones:resultados.map(d=>({folio:d.folio,deducible:String(d.niveles.find(n=>n.nivel==='A').deducible/100),tabulador:d.tabulador,totalAnual:d.monto.total,niveles:d.niveles}))};
+  return {propuesta:path.relative(dir,archivo),folio:resultados.map(d=>d.folio).join(' / '),advertencias:resultados.flatMap((d,i)=>d.advertencias.map(a=>'Opción '+(i+1)+': '+a)),opciones:resultados.map(d=>({folio:d.folio,deducible:String(d.niveles.find(n=>n.nivel==='A').deducible/100),tabulador:d.tabulador,alta:d.altaSolicitada,totalAnual:d.monto.total,niveles:d.niveles}))};
 }
 module.exports={ejecutarComparativo,documentoComparativo,validarComparacion,cambiosOpcion};
