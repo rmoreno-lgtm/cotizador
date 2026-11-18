@@ -34,6 +34,45 @@ function escenarioEtiquetado(orden=[0,1,3,2]) {
  paginas[2]=cabecera+orden.map(i=>bloques[i]).join('\n');
  return {s,paginas,bloques,cabecera};
 }
+
+function leerConFechas(fecha, vigencia) {
+ const {s,paginas}=escenario();
+ paginas[0]=paginas[0].replace('11/Oct/2026',fecha).replace('26/Oct/2026',vigencia);
+ const {fecha:cotizacion,vence}=analizarPaginas(paginas,s);
+ return {cotizacion,vence};
+}
+
+test('lee la cotización de noviembre y la vigencia de diciembre tal como aparecen en GNP',()=>{
+ assert.deepEqual(leerConFechas('17/Nov/2026','02/Dic/2026'),{
+  cotizacion:'17/nov/2026',vence:'02/dic/2026'
+ });
+});
+
+test('normaliza los doce meses en español y conserva los formatos inglés y numérico',()=>{
+ const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+ meses.forEach((mes,i)=>{
+  const esperada='01/'+mes.toLowerCase()+'/2026';
+  assert.deepEqual(leerConFechas('1/'+mes.toUpperCase()+'/2026','01/'+(i+1)+'/2026'),{
+   cotizacion:esperada,vence:esperada
+  });
+ });
+ assert.deepEqual(leerConFechas('1/Jan/2026','30/Apr/2026'),{
+  cotizacion:'01/ene/2026',vence:'30/abr/2026'
+ });
+ assert.deepEqual(leerConFechas('1/Aug/2026','31/Dec/2026'),{
+  cotizacion:'01/ago/2026',vence:'31/dic/2026'
+ });
+});
+
+test('acepta un día bisiesto real y rechaza fechas imposibles en ambos campos',()=>{
+ assert.deepEqual(leerConFechas('29/Feb/2024','1/Mar/2024'),{
+  cotizacion:'29/feb/2024',vence:'01/mar/2024'
+ });
+ for(const invalida of ['29/Feb/2026','31/Abr/2026','32/Dic/2026','00/Dic/2026','01/13/2026','01/Xyz/2026']){
+  assert.throws(()=>leerConFechas(invalida,'31/Dic/2026'),/Fecha inválida en GNP/);
+  assert.throws(()=>leerConFechas('1/Jan/2026',invalida),/Fecha inválida en GNP/);
+ }
+});
 test('identifica al titular y cada familiar por su etiqueta aunque el extractor lea las columnas en otro orden',()=>{
  for(const orden of [[0,1,3,2],[3,1,0,2],[0,2,1,3]]){
   const {s,paginas}=escenarioEtiquetado(orden);const d=analizarPaginas(paginas,s);
