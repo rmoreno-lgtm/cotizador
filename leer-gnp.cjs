@@ -30,7 +30,11 @@ function fecha(v) {
   const ingles = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
   const m=v.match(/^(\d{1,2})\/(\d{1,2}|[a-z]{3})\/(\d{4})$/i);
   if(!m) throw new Error('Fecha no reconocida en GNP.');
-  const mes=/^\d+$/.test(m[2])?Number(m[2])-1:ingles.indexOf(m[2].toLowerCase());
+  const abreviatura=m[2].toLowerCase();
+  const mesEnEspanol=meses.indexOf(abreviatura);
+  const mes=/^\d+$/.test(abreviatura)
+    ? Number(abreviatura)-1
+    : mesEnEspanol>=0 ? mesEnEspanol : ingles.indexOf(abreviatura);
   const d=Number(m[1]), y=Number(m[3]);
   const f=new Date(Date.UTC(y,mes,d));
   if(mes<0 || mes>11 || f.getUTCFullYear()!==y || f.getUTCMonth()!==mes || f.getUTCDate()!==d) throw new Error('Fecha inválida en GNP.');
