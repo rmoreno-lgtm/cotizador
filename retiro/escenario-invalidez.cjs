@@ -11,8 +11,7 @@ function aportacionesPendientes(filas,ejemplo){
   :ultimo-primero+1===pendientes.length?'años '+primero+' al '+ultimo
   :'años '+pendientes.map(f=>f.anio).join(', ');
  const cantidad=pendientes.length===1?'1 aportación':pendientes.length+' aportaciones';
- const total=pendientes.reduce((suma,f)=>suma+f.aportacion,0);
- return `<p>Con la anualidad del año ${ejemplo.anio} ya pagada, dejas de hacer <b>${cantidad}</b> (${periodo}) si la exención las cubre.</p><strong class="suma-invalidez">${dinero(total)}</strong><p>Total programado de esas aportaciones.</p>`;
+ return `<p>Ya no pagas <b>${cantidad}</b> (${periodo}).</p><p>Este ejemplo da por pagada la aportación del año ${ejemplo.anio}.</p>`;
 }
 
 function escenarioInvalidez(modelo,ejemplo){
