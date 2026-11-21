@@ -3,7 +3,7 @@ const {redactar,validarContexto}=require('../retiro/redaccion.cjs');
 const modelo={campos:{cliente:{valor:'Luz Apellido Privado'},ahorro:{valor:'999999999'}},tabla:[{proteccion:123456789}],coberturas:[{tipo:'invalidez',suma:987654321}]};
 const opciones={modelo,enfoque:'retiro',contexto:'Quiere viajar y mantener su independencia.',env:{OPENAI_API_KEY:'clave-simulada'}};
 const respuesta=datos=>({ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(datos)}]}]})});
-const textos={titulo:'Luz, un retiro con espacio para tus proyectos.',frase:'Demos forma a una propuesta que acompañe tus prioridades y tu manera de vivir.'};
+const textos={titulo:'Luz, un retiro con espacio para tus proyectos.',parrafo:'Planear tus aportaciones puede ayudarte a dar espacio a los viajes que quieres hacer.',frase:'Demos forma a una propuesta que acompañe tus prioridades y tu manera de vivir.'};
 test('Redacción envía únicamente primer nombre, enfoque y contexto; devuelve textos sin modificar el plan',async()=>{
  const antes=JSON.stringify(modelo);let peticion;
  const out=await redactar({...opciones,solicitar:async(url,opts)=>{peticion={url,opts,body:JSON.parse(opts.body)};return respuesta(textos);}});
@@ -17,7 +17,7 @@ test('Sin clave o con contexto inválido no llama al proveedor',async()=>{
  await assert.rejects(redactar({...opciones,enfoque:'__proto__',solicitar}),e=>e.status===400);assert.equal(llamadas,0);assert.equal(validarContexto('  Quiere viajar.  '),'Quiere viajar.');
 });
 test('Rechaza cifras, promesas, HTML, exceso de longitud y salidas incompletas',async()=>{
- for(const datos of [{...textos,titulo:'Luz, obtén $500 garantizados'},{...textos,frase:'Un rendimiento garantizado para ti.'},{...textos,frase:'Recibirás indemnización por invalidez.'},{...textos,titulo:'<script>alert()</script>'},{...textos,frase:'x'.repeat(161)},{...textos,titulo:''},{...textos,ahorro:999}])await assert.rejects(redactar({...opciones,solicitar:async()=>respuesta(datos)}),e=>e.status===502);
+ for(const datos of [{...textos,titulo:'Luz, obtén $500 garantizados'},{...textos,frase:'Un rendimiento garantizado para ti.'},{...textos,frase:'Recibirás indemnización por invalidez.'},{...textos,titulo:'<script>alert()</script>'},{...textos,frase:'x'.repeat(161)},{...textos,titulo:''},{...textos,parrafo:''},{...textos,parrafo:'x'.repeat(261)},{...textos,parrafo:'La cobertura garantiza $500.'},{...textos,ahorro:999}])await assert.rejects(redactar({...opciones,solicitar:async()=>respuesta(datos)}),e=>e.status===502);
  await assert.rejects(redactar({...opciones,solicitar:async()=>({ok:true,json:async()=>({status:'incomplete',output:[]})})}),e=>e.status===502);
 });
 test('Errores de proveedor, red y rechazos se comunican sin exponer la clave ni su respuesta interna',async()=>{

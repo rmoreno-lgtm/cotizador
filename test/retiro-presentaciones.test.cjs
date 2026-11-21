@@ -15,3 +15,21 @@ test('Resumida no comprime la tabla y el formato detallado continúa para planes
 test('Los cuatro enfoques mantienen cifras y cambian meta, texto e identidad visual',()=>{
  const m=modelo();for(const [clave,e]of Object.entries(ENFOQUES)){const html=vista(m,clave,{},6,{formato:'resumida'});assert.ok(html.includes(e.meta));assert.ok(html.includes(e.texto));assert.ok(html.includes(e.escenario));assert.match(html,/6,409,085/);}
 });
+
+test('El párrafo conecta la portada con el cliente y la exención suma las aportaciones posteriores',()=>{
+ const m=modelo();
+ m.tabla[7].aportacion=12500;
+ m.tabla[8].aportacion=14000;
+ m.tabla[9].aportacion=17550;
+ const parrafo='Planea tus aportaciones para tu proyecto de <diseño>.';
+ for(const formato of ['resumida','detallada']){
+  const html=vista(m,'retiro',{},7,{parrafo,formato});
+  assert.match(html,/PASO 1 · TU PROYECTO/);
+  assert.match(html,/proyecto de &lt;diseño&gt;/);
+  assert.match(html,/anualidad del año 7 ya pagada/);
+  assert.match(html,/<b>3 aportaciones<\/b> \(años 8 al 10\)/);
+  assert.match(html,/\$440.5/);
+ }
+ const despues=vista(m,'retiro',{},10,{parrafo});
+ assert.match(despues,/no quedan aportaciones programadas/);
+});
