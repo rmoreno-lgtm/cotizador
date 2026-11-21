@@ -1,5 +1,5 @@
 (()=>{
- const titulos={inicio:'Inicio','gastos-medicos':'Gastos Médicos',retiro:'Retiro',ppr:'PPR',educacion:'Educación',trasciende:'Ahorro e inversión · Trasciende',total:'Total'};
+ const titulos={inicio:'Inicio','gastos-medicos':'Gastos Médicos',tramites:'Trámites',retiro:'Retiro',ppr:'PPR',educacion:'Educación',trasciende:'Ahorro e inversión · Trasciende',total:'Total'};
  function navegar(foco=false){
   const hash=location.hash.slice(1);const clave=hash==='vida'?'retiro':hash;const seccion=Object.hasOwn(titulos,clave)?clave:'inicio';
   for(const panel of document.querySelectorAll('[data-pantalla]'))panel.hidden=panel.dataset.pantalla!==seccion;
