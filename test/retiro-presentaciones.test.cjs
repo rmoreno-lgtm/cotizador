@@ -16,7 +16,7 @@ test('Los cuatro enfoques mantienen cifras y cambian meta, texto e identidad vis
  const m=modelo();for(const [clave,e]of Object.entries(ENFOQUES)){const html=vista(m,clave,{},6,{formato:'resumida'});assert.ok(html.includes(e.meta));assert.ok(html.includes(e.texto));assert.ok(html.includes(e.escenario));assert.match(html,/6,409,085/);}
 });
 
-test('El párrafo conecta la portada con el cliente y la exención suma las aportaciones posteriores',()=>{
+test('El párrafo conecta la portada con el cliente y la exención muestra las aportaciones que dejas de pagar',()=>{
  const m=modelo();
  m.tabla[7].aportacion=12500;
  m.tabla[8].aportacion=14000;
@@ -26,9 +26,10 @@ test('El párrafo conecta la portada con el cliente y la exención suma las apor
   const html=vista(m,'retiro',{},7,{parrafo,formato});
   assert.match(html,/PASO 1 · TU PROYECTO/);
   assert.match(html,/proyecto de &lt;diseño&gt;/);
-  assert.match(html,/anualidad del año 7 ya pagada/);
-  assert.match(html,/<b>3 aportaciones<\/b> \(años 8 al 10\)/);
-  assert.match(html,/\$440.5/);
+  const exencion=html.match(/<li><h4>Dejas de aportar<\/h4>[\s\S]*?<\/li>/)[0];
+  assert.match(exencion,/Ya no pagas <b>3 aportaciones<\/b> \(años 8 al 10\)/);
+  assert.match(exencion,/da por pagada la aportación del año 7/);
+  assert.doesNotMatch(exencion,/\$|si la exención las cubre/);
  }
  const despues=vista(m,'retiro',{},10,{parrafo});
  assert.match(despues,/no quedan aportaciones programadas/);
