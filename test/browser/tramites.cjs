@@ -12,18 +12,30 @@ const {recorrer}=require('../../tramites/portal.cjs');
   });
   try {
     const page=await browser.newPage();
-    await page.route('https://portalintermediarios.gnp.com.mx/**',route=>route.fulfill({
-      contentType:'text/html; charset=utf-8',
-      body:`<nav><button onclick="document.querySelector('#servicios').hidden=false">menu</button>
-      <button id="servicios" hidden onclick="document.querySelector('#gmm').hidden=false">Servicios asistidos</button>
-      <button id="gmm" hidden onclick="document.querySelector('#buscar').hidden=false">Gastos médicos</button></nav>
-      <button id="buscar" hidden onclick="document.querySelector('#resultados').hidden=false">Buscar</button>
+    const portal=`<nav><button onclick="document.querySelector('#servicios').hidden=false">menu</button>
+      <button id="servicios" hidden onclick="document.querySelector('#consulta').hidden=false">Servicios asistidos</button>
+      <button id="consulta" hidden onclick="document.querySelector('#filtros').hidden=false">Consulta</button></nav>
+      <div id="filtros" hidden>
+        <label>Ramo <select onchange="document.querySelector('#consultar').disabled=this.value!=='medicos'">
+          <option value="vida" selected>Vida</option>
+          <option value="medicos">Gastos Médicos Mayores</option>
+        </select></label>
+        <button id="consultar" disabled onclick="document.querySelector('#resultados').hidden=false">Consultar</button>
+      </div>
       <section id="resultados" hidden><table>
         <thead><tr><th>Estado</th><th>Folio de trámite</th><th>Paciente</th></tr></thead>
         <tbody id="filas"><tr><td>En proceso</td><td>GNP-001</td><td>Dato sintético</td></tr>
         <tr><td>Cerrado</td><td>GNP-002</td><td>Dato sintético</td></tr></tbody></table>
-        <button onclick="document.querySelector('#filas').innerHTML='<tr><td>Activada</td><td>GNP-003</td><td>Dato sintético</td></tr>';this.disabled=true">Siguiente</button>
-      </section>`
+        <button onclick="document.querySelector('#filas').innerHTML='<tr><td>Activadas</td><td>GNP-003</td><td>Dato sintético</td></tr>';this.disabled=true">Siguiente</button>
+      </section>`;
+    await page.route('https://portalintermediarios.gnp.com.mx/**',route=>route.fulfill({
+      contentType:'text/html; charset=utf-8',
+      body:new URL(route.request().url()).pathname==='/selector-personalizado'
+        ?portal.replace(/<label>Ramo[^]*?<\/label>/,`<button type="button" role="combobox" aria-label="Ramo" aria-expanded="false"
+          onclick="this.setAttribute('aria-expanded','true');document.querySelector('#ramos').hidden=false">Vida</button>
+          <div role="listbox" id="ramos" hidden><div role="option"
+            onclick="this.parentElement.hidden=true;document.querySelector('#consultar').disabled=false">Gastos Médicos Mayores</div></div>`)
+        :portal
     }));
     await page.goto('https://portalintermediarios.gnp.com.mx/sesion');
     const pasos=[];
@@ -31,7 +43,9 @@ const {recorrer}=require('../../tramites/portal.cjs');
     assert.deepEqual(resultado,{paginas:2,tramites:[
       {folio:'GNP-001',estado:'En proceso'},{folio:'GNP-003',estado:'Activado'}
     ]});
-    assert.deepEqual(pasos,['Servicios asistidos','Gastos médicos','Tabla con columnas Folio y Estado']);
+    assert.deepEqual(pasos,['Servicios asistidos','Consulta','Gastos Médicos Mayores','Consultar','Tabla con columnas Folio y Estado']);
+    await page.goto('https://portalintermediarios.gnp.com.mx/selector-personalizado');
+    assert.deepEqual(await recorrer(page),resultado);
     const dir=await fs.mkdtemp(path.join(os.tmpdir(),'quillum-tramites-web-'));
     const secreto='clave-local-para-probar-tramites';
     let server;
@@ -55,6 +69,6 @@ const {recorrer}=require('../../tramites/portal.cjs');
       }
       await fs.rm(dir,{recursive:true,force:true});
     }
-    console.log('Trámites: búsqueda, orden de columnas, paginación y filtrado verificados.');
+    console.log('Trámites: ruta Consulta, selectores, orden de columnas, paginación y filtrado verificados.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
