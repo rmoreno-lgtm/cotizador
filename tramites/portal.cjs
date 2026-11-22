@@ -2,7 +2,7 @@ const {chromium}=require('playwright');
 const {iniciarSesion}=require('../cotizador-gnp.cjs');
 
 const servicios=/^servicios asistid[oa]s?$/i;
-const medicos=/^(?:gastos m[eé]dicos(?: mayores)?|gmm)$/i;
+const medicos=/^(?:gastos m[eé]dicos mayores|gmm)$/i;
 const folio=/^(?:folio(?: (?:del? )?tr[aá]mite)?|(?:n[uú]m(?:ero)?\.?|no\.?) (?:de )?tr[aá]mite)$/i;
 const estado=/^(?:estado|estatus)(?: (?:del? )?tr[aá]mite)?$/i;
 
@@ -92,29 +92,62 @@ async function leerTabla(marcos) {
   return tablas[0];
 }
 
+async function elegirGastosMedicos(page) {
+  const elegir=await esperar(async()=>{
+    const coincidencias=[];
+    for(const marco of marcosGnp(page)) {
+      for(const select of await marco.locator('select:visible').all()) {
+        const opciones=await select.locator('option:not(:disabled)').evaluateAll(opciones=>
+          opciones.map(opcion=>opcion.label));
+        for(const label of opciones.filter(o=>medicos.test(o.trim().replace(/\s+/g,' ')))) {
+          coincidencias.push(()=>select.selectOption({label}));
+        }
+      }
+    }
+    const radio=await accionUnica(marcosGnp(page),medicos,['radio']);
+    if(radio)coincidencias.push(()=>radio.check());
+    if(coincidencias.length>1)throw new ConsultaIncompleta('GNP muestra varias opciones de Gastos Médicos Mayores.');
+    if(coincidencias.length)return coincidencias[0];
+
+    const combo=await accionUnica(marcosGnp(page),/^(?:tipo de (?:seguro|servicio|tr[aá]mite|consulta)|ramo|producto|seguro|servicio|selecciona(?:r)?(?: una opci[oó]n)?)$/i,['combobox']);
+    if(!combo || await combo.evaluate(el=>el.tagName==='SELECT'))return;
+    await combo.click();
+    const opcion=await esperar(()=>accionUnica(marcosGnp(page),medicos,['option']),
+      'El selector de Consulta no ofrece Gastos Médicos Mayores.');
+    return ()=>opcion.click();
+  },'No se encontró la opción de Gastos Médicos Mayores en Consulta.');
+  await elegir();
+}
+
+async function navegarA(page,nombre,etiqueta) {
+  const roles=['link','button','menuitem','tab'];
+  const opcion=await esperar(()=>accionUnica(marcosGnp(page),nombre,roles),
+    `No se encontró la opción «${etiqueta}» en GNP.`);
+  await opcion.click();
+}
+
 async function recorrer(page, informar=()=>{}) {
   const menu=page.getByRole('button').filter({hasText:/^\s*menu\s*$/i});
   if(await menu.count()===1 && await menu.isVisible())await menu.click();
   const opciones=await describirMenu(marcosGnp(page));
   if(opciones.length)informar('Opciones visibles: '+opciones.join(' · '));
-  const roles=['link','button','menuitem','tab'];
-  for(const [nombre,etiqueta] of [[servicios,'Servicios asistidos'],[medicos,'Gastos médicos']]) {
-    if(nombre===medicos && !await accionUnica(marcosGnp(page),medicos,roles)) {
-      const cerrar=page.getByRole('button').filter({hasText:/^\s*close\s*$/i});
-      if(await cerrar.count()===1 && await cerrar.isVisible())await cerrar.click();
-    }
-    const opcion=await esperar(()=>accionUnica(marcosGnp(page),nombre,roles),`No se encontró la opción «${etiqueta}» en GNP.`);
-    await opcion.click();
-    informar(etiqueta);
+
+  await navegarA(page,servicios,'Servicios asistidos');
+  informar('Servicios asistidos');
+  const consulta=/^consulta$/i;
+  if(!await accionUnica(marcosGnp(page),consulta,['link','button','menuitem','tab'])) {
+    const cerrar=page.getByRole('button').filter({hasText:/^\s*close\s*$/i});
+    if(await cerrar.count()===1 && await cerrar.isVisible())await cerrar.click();
   }
-  // Ejecutar Buscar sin cambiar filtros, solo dentro del módulo identificado.
-  const buscar=await esperar(async()=>{
-    const marcos=marcosGnp(page);
-    const boton=await accionUnica(marcos,/^buscar$/i,['button']);
-    if(boton)return {boton};
-    if((await leerTabla(marcos))?.listo)return {};
-  },'No se encontró la tabla de trámites ni el botón Buscar.');
-  if(buscar.boton)await buscar.boton.click();
+  await navegarA(page,consulta,'Consulta');
+  informar('Consulta');
+  await elegirGastosMedicos(page);
+  informar('Gastos Médicos Mayores');
+
+  const consultar=await esperar(()=>accionUnica(marcosGnp(page),/^consultar$/i,['button','link']),
+    'No se encontró el botón Consultar para Gastos Médicos Mayores.');
+  await consultar.click();
+  informar('Consultar');
   let tabla=await esperar(async()=>{
     const datos=await leerTabla(marcosGnp(page));
     if(datos?.listo)return datos;
@@ -128,12 +161,13 @@ async function recorrer(page, informar=()=>{}) {
     if(visitadas.has(firma) || visitadas.size>=100)throw new ConsultaIncompleta('No se pudo confirmar el final de la paginación.');
     visitadas.add(firma);
     for(const tramite of tabla.tramites) {
-      const valor=tramite.estado.normalize('NFC').toLowerCase();
+      const texto=tramite.estado.normalize('NFC').toLowerCase();
+      const valor=/^activad[oa]s?$/.test(texto)?'activado':texto;
       if(vistos.has(tramite.folio) && vistos.get(tramite.folio)!==valor) {
         throw new ConsultaIncompleta('GNP muestra estados diferentes para el mismo folio.');
       }
       vistos.set(tramite.folio,valor);
-      if(valor==='en proceso' || valor==='activado' || valor==='activada') {
+      if(valor==='en proceso' || valor==='activado') {
         activos.set(tramite.folio,{folio:tramite.folio,estado:valor==='en proceso'?'En proceso':'Activado'});
       }
     }
