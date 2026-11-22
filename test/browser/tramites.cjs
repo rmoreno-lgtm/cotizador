@@ -12,12 +12,17 @@ const {recorrer}=require('../../tramites/portal.cjs');
   });
   try {
     const page=await browser.newPage();
-    const portal=`<nav><button onclick="document.querySelector('#servicios').hidden=false">menu</button>
-      <button id="servicios" hidden onclick="document.querySelector('#consulta').hidden=false">Servicios asistidos</button>
-      <button id="consulta" hidden onclick="document.querySelector('#filtros').hidden=false">Consulta</button></nav>
-      <div id="filtros" hidden>
+    const acceso=`<nav><button onclick="document.querySelector('#servicios').hidden=false">menu</button>
+      <button id="servicios" hidden onclick="document.querySelector('#servicios-asistidos').hidden=false">Servicios asistidos</button></nav>
+      <main id="servicios-asistidos" hidden>
+        <section><h2>Solo vida</h2><button onclick="document.body.innerHTML='Ruta incorrecta'">Consulta</button></section>
+        <div style="height:1600px"></div>
+        <section><h2>Todos los ramos</h2>__CONSULTA__</section>
+      </main>`;
+    const formulario=`<div id="filtros" __OCULTO__>
         <label>Ramo <select onchange="document.querySelector('#consultar').disabled=this.value!=='medicos'">
           <option value="vida" selected>Vida</option>
+          <option value="autos">Autos</option>
           <option value="medicos">Gastos Médicos Mayores</option>
         </select></label>
         <button id="consultar" disabled onclick="document.querySelector('#resultados').hidden=false">Consultar</button>
@@ -28,23 +33,31 @@ const {recorrer}=require('../../tramites/portal.cjs');
         <tr><td>Cerrado</td><td>GNP-002</td><td>Dato sintético</td></tr></tbody></table>
         <button onclick="document.querySelector('#filas').innerHTML='<tr><td>Activadas</td><td>GNP-003</td><td>Dato sintético</td></tr>';this.disabled=true">Siguiente</button>
       </section>`;
-    await page.route('https://portalintermediarios.gnp.com.mx/**',route=>route.fulfill({
-      contentType:'text/html; charset=utf-8',
-      body:new URL(route.request().url()).pathname==='/selector-personalizado'
-        ?portal.replace(/<label>Ramo[^]*?<\/label>/,`<button type="button" role="combobox" aria-label="Ramo" aria-expanded="false"
+    await page.context().route('https://portalintermediarios.gnp.com.mx/**',route=>{
+      const {pathname}=new URL(route.request().url());
+      let body;
+      if(pathname==='/consulta-gnp'){
+        body=formulario.replace('__OCULTO__','').replace(/<label>Ramo[^]*?<\/label>/,
+          `<button type="button" role="combobox" aria-label="Ramo" aria-expanded="false"
           onclick="this.setAttribute('aria-expanded','true');document.querySelector('#ramos').hidden=false">Vida</button>
           <div role="listbox" id="ramos" hidden><div role="option"
-            onclick="this.parentElement.hidden=true;document.querySelector('#consultar').disabled=false">Gastos Médicos Mayores</div></div>`)
-        :portal
-    }));
+            onclick="this.parentElement.hidden=true;document.querySelector('#consultar').disabled=false">Gastos Médicos</div></div>`);
+      }else if(pathname==='/consulta-nueva-pestana'){
+        body=acceso.replace('__CONSULTA__',`<div onclick="window.open('/consulta-gnp','_blank')"><span>Consulta</span></div>`);
+      }else{
+        body=acceso.replace('__CONSULTA__',`<button onclick="document.querySelector('#filtros').hidden=false">Consulta</button>`)+
+          formulario.replace('__OCULTO__','hidden');
+      }
+      return route.fulfill({contentType:'text/html; charset=utf-8',body});
+    });
     await page.goto('https://portalintermediarios.gnp.com.mx/sesion');
     const pasos=[];
     const resultado=await recorrer(page,paso=>pasos.push(paso));
     assert.deepEqual(resultado,{paginas:2,tramites:[
       {folio:'GNP-001',estado:'En proceso'},{folio:'GNP-003',estado:'Activado'}
     ]});
-    assert.deepEqual(pasos,['Servicios asistidos','Consulta','Gastos Médicos Mayores','Consultar','Tabla con columnas Folio y Estado']);
-    await page.goto('https://portalintermediarios.gnp.com.mx/selector-personalizado');
+    assert.deepEqual(pasos,['Servicios asistidos','Todos los ramos → Consulta','Gastos Médicos Mayores','Consultar','Tabla con columnas Folio y Estado']);
+    await page.goto('https://portalintermediarios.gnp.com.mx/consulta-nueva-pestana');
     assert.deepEqual(await recorrer(page),resultado);
     const dir=await fs.mkdtemp(path.join(os.tmpdir(),'quillum-tramites-web-'));
     const secreto='clave-local-para-probar-tramites';
@@ -69,6 +82,6 @@ const {recorrer}=require('../../tramites/portal.cjs');
       }
       await fs.rm(dir,{recursive:true,force:true});
     }
-    console.log('Trámites: ruta Consulta, selectores, orden de columnas, paginación y filtrado verificados.');
+    console.log('Trámites: tarjeta Todos los ramos, Consulta en nueva pestaña, selector y paginación verificados.');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
