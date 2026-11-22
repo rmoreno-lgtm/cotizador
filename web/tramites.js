@@ -1,17 +1,22 @@
 (()=>{
   const elemento=id=>document.getElementById('tramites-'+id);
   const boton=elemento('actualizar');
+  const reporte=elemento('reporte');
   const mensaje=elemento('mensaje');
   const formato=new Intl.DateTimeFormat('es-MX',{dateStyle:'medium',timeStyle:'short'});
   let temporizador;
   let pendiente=false;
 
-  function mostrar({configurado,enCurso,error,ultimaConsulta,exploracion}) {
+  function mostrar({configurado,enCurso,error,ultimaConsulta,exploracion,vistaPrevia}) {
     boton.disabled=!configurado || enCurso;
+    reporte.disabled=!configurado || enCurso || !vistaPrevia;
+    mostrarVista(vistaPrevia);
     mensaje.textContent=error || (enCurso?'Consultando GNP…':configurado
-      ? (ultimaConsulta?'':'Aún no se ha consultado GNP.')
+      ? (vistaPrevia || ultimaConsulta?'':'Abre la tabla de GNP antes de generar el reporte.')
       : 'La consulta requiere las credenciales de GNP en Railway.');
-    elemento('exploracion').hidden=!exploracion.length;
+    const ruta=elemento('exploracion');
+    ruta.hidden=!exploracion.length;
+    if(error && exploracion.length)ruta.open=true;
     elemento('pasos').replaceChildren(...exploracion.map(texto=>{
       const li=document.createElement('li');
       li.textContent=texto;
@@ -32,6 +37,30 @@
     }));
   }
 
+  function mostrarVista(vista) {
+    elemento('vista').hidden=!vista;
+    if(!vista){
+      elemento('vista-columnas').replaceChildren();
+      elemento('vista-filas').replaceChildren();
+      return;
+    }
+    const {columnas,filas,consultadoEn}=vista;
+    elemento('vista-detalle').textContent=filas.length
+      ? 'Primera página · '+filas.length+' filas · '+formato.format(new Date(consultadoEn))
+      : 'GNP indicó que no hay trámites en esta consulta.';
+    elemento('vista-columnas').replaceChildren(...columnas.map(nombre=>{
+      const th=document.createElement('th');
+      th.scope='col';
+      th.textContent=nombre;
+      return th;
+    }));
+    elemento('vista-filas').replaceChildren(...filas.map(celdas=>{
+      const fila=document.createElement('tr');
+      for(const valor of celdas)fila.insertCell().textContent=valor;
+      return fila;
+    }));
+  }
+
   async function cargar() {
     if(pendiente || location.hash!=='#tramites')return;
     clearTimeout(temporizador);
@@ -48,19 +77,24 @@
     } finally {pendiente=false;}
   }
 
-  boton.addEventListener('click',async()=>{
+  async function iniciar(ruta) {
     boton.disabled=true;
+    reporte.disabled=true;
     mensaje.textContent='Iniciando consulta…';
     try {
-      const respuesta=await fetch('/api/tramites/actualizar',{method:'POST'});
-      if(!respuesta.ok)throw new Error();
-    } catch {
-      mensaje.textContent='No se pudo iniciar la consulta. Vuelve a intentarlo.';
-      boton.disabled=false;
-      return;
+      const respuesta=await fetch('/api/tramites/'+ruta,{method:'POST'});
+      if(!respuesta.ok){
+        const datos=await respuesta.json().catch(()=>({}));
+        throw new Error(datos.error || 'No se pudo iniciar la consulta.');
+      }
+      await cargar();
+    } catch(error) {
+      await cargar();
+      mensaje.textContent=error.message;
     }
-    await cargar();
-  });
+  }
+  boton.addEventListener('click',()=>iniciar('vista'));
+  reporte.addEventListener('click',()=>iniciar('actualizar'));
   window.addEventListener('hashchange',cargar);
   void cargar();
 })();

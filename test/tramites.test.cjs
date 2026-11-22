@@ -17,7 +17,7 @@ test('Trámites exige autenticación y usa la configuración de GNP existente',a
   assert.equal((await fetch(server+'/api/tramites')).status,401);
   const headers={Authorization:'Bearer '+clave};
   assert.deepEqual(await (await fetch(server+'/api/tramites',{headers})).json(),{
-    configurado:false,enCurso:false,error:null,exploracion:[],ultimaConsulta:null
+    configurado:false,enCurso:false,error:null,exploracion:[],ultimaConsulta:null,vistaPrevia:null
   });
   assert.equal((await fetch(server+'/api/tramites/actualizar',{method:'POST',headers})).status,503);
 });
@@ -35,16 +35,24 @@ test('consolida actualizaciones simultáneas y conserva el último resultado tra
   const app=express();
   let consultas=0;
   let completar;
+  const muestra={columnas:['Folio','Estado','Columna adicional'],filas:[['A-1','En proceso','Sintético'],['A-2','Cerrado','Sintético']]};
   const esperado={tramites:[{folio:'A-1',estado:'En proceso'}],paginas:1};
-  registrar(app,{base:dir,env:{GNP_USERNAME:'prueba',GNP_PASSWORD:'prueba'},consultarPortal:async(env,paso)=>{
-    consultas++;
+  registrar(app,{base:dir,env:{GNP_USERNAME:'prueba',GNP_PASSWORD:'prueba'},consultarPortal:async(env,paso,modo)=>{
     paso('Servicios asistidos');
+    if(modo==='vista')return muestra;
+    consultas++;
     if(consultas>1)throw new ConsultaIncompleta('La tabla cambió.');
     return await new Promise(resolve=>{completar=resolve;});
   }});
   const base=await escuchar(app,t);
   const actualizar=()=>fetch(base+'/api/tramites/actualizar',{method:'POST'});
   const estado=async()=>await (await fetch(base+'/api/tramites')).json();
+  assert.equal((await actualizar()).status,409);
+  assert.equal((await fetch(base+'/api/tramites/vista',{method:'POST'})).status,202);
+  const previa=await estado();
+  assert.deepEqual(previa.vistaPrevia.filas,muestra.filas);
+  assert.equal(previa.ultimaConsulta,null);
+  await assert.rejects(fs.access(path.join(dir,'tramites-gnp.json')),{code:'ENOENT'});
   assert.deepEqual((await Promise.all([actualizar(),actualizar()])).map(r=>r.status),[202,202]);
   assert.equal(consultas,1);
   assert.equal((await estado()).enCurso,true);
