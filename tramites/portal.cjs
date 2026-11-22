@@ -116,6 +116,41 @@ async function opcionVisible(ambitos,nombre) {
   return visibles[0];
 }
 
+async function flechaGastosMedicos(marcos) {
+  const candidatas=[];
+  for(const marco of marcos) {
+    for(const titulo of await marco.getByText(medicos).all()) {
+      if(!await titulo.isVisible())continue;
+      let bloque=titulo;
+      for(let nivel=0;nivel<6;nivel++){
+        if(await bloque.evaluate(el=>el.matches('html,body,main,[role="main"]')))break;
+        const selector='button,[role="button"],summary,[aria-expanded][aria-controls],a[aria-controls],a[data-toggle],a[data-bs-toggle],a[href^="#"]';
+        const controles=bloque.and(marco.locator(selector)).or(bloque.locator(selector));
+        const flechas=[];
+        for(const control of await controles.all()){
+          if(!await control.isVisible())continue;
+          const esFlecha=await control.evaluate(el=>{
+            const texto=(el.innerText || '').trim();
+            const etiqueta=(el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
+            return (el.matches('summary,[aria-expanded],[data-toggle="collapse"],[data-bs-toggle="collapse"]') ||
+              /^(?:[›»⌄∨▼▾⌃▲▴+−]|expand_more|keyboard_arrow_down|arrow_drop_down|chevron_right|expandir|desplegar|ver m[aá]s)$/i.test(texto || etiqueta) ||
+              (!texto && !etiqueta && Boolean(el.querySelector('svg,i'))));
+          });
+          if(esFlecha)flechas.push(control);
+        }
+        if(flechas.length>1)throw new ConsultaIncompleta('Hay varias flechas junto a Gastos Médicos. No se pudo identificar cuál abre Consulta.');
+        if(flechas.length){
+          candidatas.push({marco,control:flechas[0]});
+          break;
+        }
+        bloque=bloque.locator('..');
+      }
+    }
+  }
+  if(candidatas.length>1)throw new ConsultaIncompleta('GNP muestra varios desplegables de Gastos Médicos.');
+  return candidatas[0];
+}
+
 async function consultaGastosMedicos(marcos) {
   const acciones=[];
   for(const marco of marcos) {
@@ -132,6 +167,71 @@ async function consultaGastosMedicos(marcos) {
   }
   if(acciones.length>1)throw new ConsultaIncompleta('GNP muestra varias tarjetas de Gastos Médicos con Consulta.');
   return acciones[0];
+}
+
+async function textosConsulta(marcos) {
+  const visibles=[];
+  for(const marco of marcos) {
+    for(const loc of await marco.getByText(/^consulta$/i).all()) {
+      if(await loc.isVisible())visibles.push({marco,loc});
+    }
+  }
+  return visibles;
+}
+
+async function abrirGastosMedicos(marcosDisponibles,informar) {
+  const hallazgo=await esperar(async()=>{
+    const marcos=marcosDisponibles();
+    const flecha=await flechaGastosMedicos(marcos);
+    if(flecha)return flecha;
+    const control=await accionUnica(marcos,medicos,['link','button','menuitem','tab','treeitem']);
+    if(control)return {control};
+  },'Se buscó «Gastos Médicos», pero no se encontró su flecha ni un control para abrir la sección.');
+
+  informar('Gastos Médicos localizado');
+  const {control,marco}=hallazgo;
+  const destino=marco && await control.evaluate(el=>el.getAttribute('aria-controls') ||
+    el.getAttribute('data-bs-target')?.replace(/^#/,'') || el.getAttribute('data-target')?.replace(/^#/,''));
+  const abierto=marco && await control.evaluate(el=>el.getAttribute('aria-expanded')==='true' ||
+    Boolean(el.closest('details[open]') && el.matches('summary')));
+  const anteriores=new Map();
+  try{
+    if(!destino && !abierto){
+      for(const {marco,loc} of await textosConsulta(marcosDisponibles())){
+        if(!anteriores.has(marco))anteriores.set(marco,[]);
+        anteriores.get(marco).push(await loc.elementHandle());
+      }
+    }
+    if(!abierto){
+      await control.scrollIntoViewIfNeeded();
+      await control.click();
+    }
+    informar('Gastos Médicos desplegado');
+    return await esperar(async()=>{
+      if(destino){
+        const panel=marco.locator('[id='+JSON.stringify(destino)+']');
+        return await opcionVisible([panel],/^consulta$/i);
+      }
+      const marcos=marcosDisponibles();
+      if(abierto)return await consultaGastosMedicos(marcos);
+
+      const nuevas=[];
+      for(const {marco,loc} of await textosConsulta(marcos)){
+        const previas=anteriores.get(marco) || [];
+        // Un documento nuevo invalida los handles de los elementos anteriores.
+        const yaVisible=previas.length && await loc.evaluate((el,otros)=>otros.includes(el),previas)
+          .catch(error=>{
+            if(/JSHandles can be evaluated only in the context|Cannot find context/i.test(error.message))return false;
+            throw error;
+          });
+        if(!yaVisible)nuevas.push(loc);
+      }
+      if(nuevas.length>1)throw new ConsultaIncompleta('El desplegable mostró varias opciones «Consulta».');
+      return nuevas[0];
+    },'Se abrió Gastos Médicos, pero no apareció «Consulta» dentro de su sección.');
+  }finally{
+    await Promise.allSettled([...anteriores.values()].flat().map(handle=>handle.dispose()));
+  }
 }
 
 async function recorrer(page, informar=()=>{}, modo='reporte') {
@@ -152,17 +252,13 @@ async function recorrer(page, informar=()=>{}, modo='reporte') {
 
   const cerrar=page.getByRole('button').filter({hasText:/^\s*close\s*$/i});
   if(!page.isClosed() && await cerrar.count()===1 && await cerrar.isVisible())await cerrar.click();
-  for(const [nombre,etiqueta] of [[/^gmm$/i,'GMM'],[medicos,'Gastos Médicos']]) {
-    const opcion=await esperar(()=>opcionVisible(marcosDisponibles(),nombre),
-      `No se encontró «${etiqueta}» en la ruta de Servicios asistidos.`);
-    await opcion.click();
-    informar(etiqueta);
-  }
+  const gmm=await esperar(()=>opcionVisible(marcosDisponibles(),/^gmm$/i),
+    'No se encontró «GMM» después de abrir Servicios asistidos.');
+  await gmm.click();
+  informar('GMM');
 
-  const consulta=await esperar(async()=>{
-    const marcos=marcosDisponibles();
-    return await consultaGastosMedicos(marcos) || await opcionVisible(marcos,/^consulta$/i);
-  },'No se encontró «Consulta» después de abrir Gastos Médicos.');
+  const consulta=await abrirGastosMedicos(marcosDisponibles,informar);
+  await consulta.scrollIntoViewIfNeeded();
   const paginaConsulta=consulta.page();
   const otrasPestanas=new Set(contexto.pages().filter(p=>p!==paginaConsulta));
   await consulta.click();
