@@ -25,3 +25,19 @@ test('Errores de proveedor, red y rechazos se comunican sin exponer la clave ni 
  await assert.rejects(redactar({...opciones,solicitar:async()=>{throw Error('detalle-interno clave-simulada');}}),e=>e.status===502&&!/detalle-interno|clave-simulada/.test(e.message));
  await assert.rejects(redactar({...opciones,solicitar:async()=>({ok:true,json:async()=>({status:'completed',output:[{type:'message',content:[{type:'refusal',refusal:'motivo'}]}]})})}),e=>e.status===502);
 });
+
+test('Distingue el rechazo de la clave, permisos, región y cuota sin revelar la respuesta original',async()=>{
+ for(const [status,code,mensaje] of [
+  [401,'invalid_api_key',/HTTP 401, clave inválida/],
+  [403,'missing_scope',/denegó el acceso \(HTTP 403\)/],
+  [403,'unsupported_country_region_territory',/rechazó la región/],
+  [429,'insufficient_quota',/alcanzó su cuota/]
+ ]){
+  const solicitar=async()=>({ok:false,status,json:async()=>({error:{code,message:'contenido-interno clave-simulada'}})});
+  await assert.rejects(redactar({...opciones,solicitar}),e=>{
+   assert.match(e.message,mensaje);
+   assert.doesNotMatch(e.message,/contenido-interno|clave-simulada|missing_scope/);
+   return true;
+  });
+ }
+});
