@@ -26,8 +26,19 @@
     <p>GNP · Servicios asistidos · Gastos Médicos</p>
   </div>
   <div class="panel">
-    <button id="tramites-actualizar" type="button" disabled>Consultar GNP</button>
+    <button id="tramites-actualizar" type="button" disabled>Ver tabla de GNP</button>
     <p id="tramites-mensaje" role="status"></p>
+    <section id="tramites-vista" hidden aria-labelledby="tramites-vista-titulo">
+      <h2 id="tramites-vista-titulo">Tabla de Consulta en GNP</h2>
+      <p id="tramites-vista-detalle" class="hint"></p>
+      <div class="tramites-vista-tabla" tabindex="0" role="region" aria-label="Datos de la primera página de GNP">
+        <table aria-labelledby="tramites-vista-titulo">
+          <thead><tr id="tramites-vista-columnas"></tr></thead>
+          <tbody id="tramites-vista-filas"></tbody>
+        </table>
+      </div>
+      <button id="tramites-reporte" type="button" disabled>Generar reporte de estados</button>
+    </section>
     <p id="tramites-consulta" class="hint"></p>
     <div id="tramites-resultados" hidden>
       <p id="tramites-totales"></p>

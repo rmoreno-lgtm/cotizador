@@ -9,10 +9,18 @@ function registrar(app,{env,base,consultarPortal=consultar}) {
   let enCurso=false;
   let error=null;
   let exploracion=[];
+  let vistaPrevia=null;
+  let caducidadVista;
 
-  async function actualizar() {
+  async function actualizar(modo) {
     try {
-      const resultado=await consultarPortal(env,paso=>exploracion.push(paso));
+      const resultado=await consultarPortal(env,paso=>exploracion.push(paso),modo);
+      if(modo==='vista'){
+        const vista={...resultado,exploracion,consultadoEn:new Date().toISOString()};
+        vistaPrevia=vista;
+        caducidadVista=setTimeout(()=>{vistaPrevia=null;},10*60*1000).unref();
+        return;
+      }
       const instantanea={...resultado,exploracion,consultadoEn:new Date().toISOString()};
       const temporal=archivo+'.'+randomUUID()+'.tmp';
       try {
@@ -30,17 +38,24 @@ function registrar(app,{env,base,consultarPortal=consultar}) {
     let ultimaConsulta=null;
     try {ultimaConsulta=JSON.parse(await fs.readFile(archivo,'utf8'));}
     catch(causa) {if(causa.code!=='ENOENT')throw causa;}
-    res.json({configurado,enCurso,error,exploracion:enCurso || error ? exploracion : ultimaConsulta?.exploracion || [],ultimaConsulta});
+    res.json({configurado,enCurso,error,exploracion:enCurso || error ? exploracion : vistaPrevia?.exploracion || ultimaConsulta?.exploracion || [],ultimaConsulta,vistaPrevia});
   });
-  app.post('/api/tramites/actualizar',(req,res)=>{
+  function iniciar(modo,res) {
     if(!configurado)return res.status(503).json({error:'La consulta requiere las credenciales de GNP en Railway.'});
+    if(modo==='reporte' && !vistaPrevia)return res.status(409).json({error:'Abre primero la vista previa de la tabla en GNP.'});
     if(!enCurso) {
       enCurso=true;
       error=null;
       exploracion=[];
-      void actualizar();
+      if(modo==='vista'){
+        clearTimeout(caducidadVista);
+        vistaPrevia=null;
+      }
+      void actualizar(modo);
     }
     res.sendStatus(202);
-  });
+  }
+  app.post('/api/tramites/vista',(req,res)=>iniciar('vista',res));
+  app.post('/api/tramites/actualizar',(req,res)=>iniciar('reporte',res));
 }
 module.exports={registrar};
