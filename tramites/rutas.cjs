@@ -2,8 +2,42 @@ const fs=require('node:fs/promises');
 const path=require('node:path');
 const {randomUUID}=require('node:crypto');
 const {consultar,ConsultaIncompleta}=require('./portal.cjs');
+const {crearVigilancias}=require('./vigilancias.cjs');
+const {ReglaInvalida}=require('./reglas.cjs');
 
-function registrar(app,{env,base,consultarPortal=consultar}) {
+function registrarVigilancias(app,{env,base,leer,enviar,programar}) {
+  const vigilancias=crearVigilancias({env,base,leer:leer || require('./lector.cjs').leerSecciones,...(enviar?{enviar}:{})});
+  if(programar)vigilancias.iniciar();
+  const manejar=fn=>async(req,res,next)=>{
+    try {await fn(req,res);}
+    catch(error){
+      if(error instanceof ReglaInvalida)return res.status(400).json({error:error.message});
+      next(error);
+    }
+  };
+  app.get('/tramites.css',(req,res)=>res.sendFile(path.join(__dirname,'../web/tramites.css')));
+  app.get('/api/tramites/vigilancias',manejar(async(req,res)=>res.json(await vigilancias.listar())));
+  app.post('/api/tramites/vigilancias',manejar(async(req,res)=>res.status(201).json(await vigilancias.crear(req.body))));
+  app.put('/api/tramites/vigilancias/:id',manejar(async(req,res)=>{
+    const regla=await vigilancias.actualizar(req.params.id,req.body);
+    regla?res.json(regla):res.status(404).json({error:'La regla no existe.'});
+  }));
+  app.delete('/api/tramites/vigilancias/:id',manejar(async(req,res)=>{
+    (await vigilancias.eliminar(req.params.id))?res.sendStatus(204):res.status(404).json({error:'La regla no existe.'});
+  }));
+  app.get('/api/tramites/vigilancias/:id/tramites',manejar(async(req,res)=>res.json(await vigilancias.tramites(req.params.id))));
+  app.post('/api/tramites/vigilancias/:id/ejecutar',manejar(async(req,res)=>{
+    if(!env.GNP_USERNAME || !env.GNP_PASSWORD)return res.status(503).json({error:'La consulta requiere las credenciales de GNP en Railway.'});
+    const r=await vigilancias.ejecutarAhora(req.params.id);
+    if(r===null)return res.status(404).json({error:'La regla no existe.'});
+    if(r===false)return res.status(409).json({error:'Ya hay una revisión en curso. Intenta en unos minutos.'});
+    res.sendStatus(202);
+  }));
+  return vigilancias;
+}
+
+function registrar(app,{env,base,consultarPortal=consultar,leerPortal,enviarAviso,programar=env.NODE_ENV==='production'}) {
+  registrarVigilancias(app,{env,base,leer:leerPortal,enviar:enviarAviso,programar});
   const archivo=path.join(base,'tramites-gnp.json');
   const configurado=Boolean(env.GNP_USERNAME && env.GNP_PASSWORD);
   let enCurso=false;
