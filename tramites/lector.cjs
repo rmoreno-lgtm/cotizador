@@ -234,17 +234,20 @@ async function leerObservaciones(page,marco,ot) {
   // Se espera a que el detalle termine de cargar: debe mostrar la OT y el expediente, y el texto
   // debe quedarse igual al menos 1.5 s (las observaciones llegan después del resto de la pantalla).
   let previo='';
+  const inicio=Date.now();
   const encontrado=await esperar(async()=>{
     for(const p of contexto.pages()){
       const f=p.frames().find(x=>DETALLE.test(x.url()) && x.url().includes('orden_id='+ot));
       if(!f)continue;
       const texto=await f.evaluate(()=>document.body.innerText).catch(()=>'');
-      const listo=texto.includes(ot) && /Observaciones Portal/i.test(texto) && /Expediente Digital/i.test(texto);
+      // Listo cuando ya hay observaciones cargadas; si el trámite no tiene ninguna, se acepta tras 20 s estable.
+      const listo=texto.includes(ot) && /Observaciones Portal/i.test(texto) && /Expediente Digital/i.test(texto) &&
+        (/INTRODUCIDO POR/.test(texto) || Date.now()-inicio>20000);
       if(listo && texto===previo)return {f,p,texto};
       previo=listo?texto:'';
       await pausa(1500);
     }
-  },'No se abrió el detalle de la OT '+ot+'.',40000);
+  },'No se abrió el detalle de la OT '+ot+'.',60000);
   const texto=encontrado.texto;
   if(!ventanasAntes.has(encontrado.p))await encontrado.p.close();
   return leerDetalle(texto);
