@@ -33,11 +33,19 @@ const {recorrer}=require('../../tramites/portal.cjs');
       <tr><td>Cerrado</td><td>GNP-002</td><td>Dato sintético</td></tr></tbody></table>
       <button onclick="document.querySelector('#filas').innerHTML='<tr><td>Activadas</td><td>GNP-003</td><td>Dato sintético</td></tr>';this.disabled=true">Siguiente</button>
     </section>`;
+    await page.context().route('https://wf-consultasdas.gnp.com.mx/**',route=>route.fulfill({
+      contentType:'text/html; charset=utf-8',
+      body:`<button onclick="document.querySelector('#resultados').hidden=false">Consultar</button>`+
+        tablaGnp.replace('__OCULTO__','hidden').replace('Folio de trámite','OT')
+    }));
     await page.context().route('https://portalintermediarios.gnp.com.mx/**',route=>{
       const {pathname}=new URL(route.request().url());
       let body;
       if(pathname==='/consulta-gnp'){
         body=tablaGnp.replace('__OCULTO__','');
+      }else if(pathname==='/consulta-das'){
+        body=acceso.replace('__CONSULTA__',`<button onclick="document.querySelector('#das').src='https://wf-consultasdas.gnp.com.mx/'">Consulta</button>`)+
+          '<iframe id="das"></iframe>';
       }else if(pathname==='/consulta-nueva-pestana'){
         body=acceso.replace('aria-controls="medicos"','').replace('__CONSULTA__',`<div onclick="window.open('/consulta-gnp','_blank')"><span>Consulta</span></div>`);
       }else{
@@ -62,6 +70,10 @@ const {recorrer}=require('../../tramites/portal.cjs');
     assert.deepEqual(pasos,['Servicios asistidos','GMM','Gastos Médicos localizado','Gastos Médicos desplegado','Consulta','Tabla de Consulta']);
     await page.goto('https://portalintermediarios.gnp.com.mx/consulta-nueva-pestana');
     assert.deepEqual(await recorrer(page),resultado);
+    await page.goto('https://portalintermediarios.gnp.com.mx/consulta-das');
+    const pasosDas=[];
+    assert.deepEqual(await recorrer(page,paso=>pasosDas.push(paso)),resultado);
+    assert.ok(pasosDas.includes('Consultar en DAS'));
     const dir=await fs.mkdtemp(path.join(os.tmpdir(),'quillum-tramites-web-'));
     const secreto='clave-local-para-probar-tramites';
     let server;

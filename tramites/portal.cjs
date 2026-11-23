@@ -3,7 +3,7 @@ const {iniciarSesion}=require('../cotizador-gnp.cjs');
 
 const servicios=/^servicios asistid[oa]s?$/i;
 const medicos=/^(?:gastos? m[eé]dicos?(?: mayores)?)$/i;
-const folio=/^(?:folio(?: (?:del? )?tr[aá]mite)?|(?:n[uú]m(?:ero)?\.?|no\.?) (?:de )?tr[aá]mite)$/i;
+const folio=/^(?:o\.?t\.?|orden de trabajo|folio(?: (?:del? )?tr[aá]mite)?|(?:n[uú]m(?:ero)?\.?|no\.?) (?:de )?tr[aá]mite)$/i;
 const estado=/^(?:estado|estatus)(?: (?:del? )?tr[aá]mite)?$/i;
 
 class ConsultaIncompleta extends Error {}
@@ -263,10 +263,20 @@ async function recorrer(page, informar=()=>{}, modo='reporte') {
   const otrasPestanas=new Set(contexto.pages().filter(p=>p!==paginaConsulta));
   await consulta.click();
   informar('Consulta');
+  let consultaEnviada=false;
   let tabla=await esperar(async()=>{
     const marcos=contexto.pages().filter(p=>!otrasPestanas.has(p)).flatMap(marcosGnp);
     const datos=await leerTabla(marcos,modo);
     if(datos?.listo)return datos;
+    if(!consultaEnviada){
+      const marcosDas=marcos.filter(marco=>new URL(marco.url()).hostname==='wf-consultasdas.gnp.com.mx');
+      const consultar=await accionUnica(marcosDas,/^consultar$/i,['button']);
+      if(consultar && await consultar.isEnabled()){
+        await consultar.click();
+        consultaEnviada=true;
+        informar('Consultar en DAS');
+      }
+    }
   },'Consulta no mostró una tabla reconocible con filas o un mensaje de que no hay trámites.');
   informar('Tabla de Consulta');
   if(modo==='vista')return {columnas:tabla.columnas,filas:tabla.filas};
