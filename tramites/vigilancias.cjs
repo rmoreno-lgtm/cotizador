@@ -105,7 +105,7 @@ function crearVigilancias({env,base,leer,enviar=avisos.enviarAviso,reloj=()=>new
         delete p.fechas;
       }
       let leido;
-      try {leido=await leer(env,pedidos,paso=>progreso.push(paso));}
+      try {leido=await leer(env,pedidos,paso=>progreso.push(paso),{captura:path.join(base,'tramites-error.png')});}
       catch(error){leido=Object.fromEntries(Object.keys(pedidos).map(s=>[s,{ok:false,error:error.message || 'No se pudo consultar GNP.'}]));}
       const ahora=reloj();
       for(const r of lista){
@@ -115,7 +115,7 @@ function crearVigilancias({env,base,leer,enviar=avisos.enviarAviso,reloj=()=>new
         regla.proximaEjecucion=new Date(ahora.getTime()+regla.cadaMinutos*60000).toISOString();
         const seccion=leido[regla.seccion];
         if(!seccion?.ok){
-          regla.ultimoResultado={ok:false,error:seccion?.error || 'Sin respuesta de GNP.'};
+          regla.ultimoResultado={ok:false,error:seccion?.error || 'Sin respuesta de GNP.',captura:true};
           continue;
         }
         const vista=Object.fromEntries(reglas.filtrar(regla,seccion.tramites).map(t=>[t.ot,reglas.instantanea(t)]));
@@ -123,7 +123,7 @@ function crearVigilancias({env,base,leer,enviar=avisos.enviarAviso,reloj=()=>new
         const inicial=!anterior;
         const cambios=inicial?[]:reglas.comparar(regla,anterior.tramites,vista);
         datos.estados[regla.id]={actualizado:ahora.toISOString(),tramites:vista};
-        regla.ultimoResultado={ok:true,cambios:cambios.length,enVista:Object.keys(vista).length,inicial};
+        regla.ultimoResultado={ok:true,cambios:cambios.length,enVista:Object.keys(vista).length,inicial,advertencias:(seccion.advertencias || []).slice(0,5)};
         if(inicial || cambios.length){
           const aviso=reglas.armarAviso(regla,{cambios,vista,inicial,fecha:ahora,zona});
           const envio=(regla.correos.length || regla.whatsapp.length)?await enviar(env,regla,aviso):{correo:null,whatsapp:[]};
@@ -158,7 +158,7 @@ function crearVigilancias({env,base,leer,enviar=avisos.enviarAviso,reloj=()=>new
   }
   function detener(){clearInterval(temporizador);temporizador=null;}
 
-  return {listar,crear,actualizar,eliminar,tramites,ejecutar,revisar,ejecutarAhora,iniciar,detener,estaOcupado:()=>ocupado};
+  return {captura:path.join(base,'tramites-error.png'),listar,crear,actualizar,eliminar,tramites,ejecutar,revisar,ejecutarAhora,iniciar,detener,estaOcupado:()=>ocupado};
 }
 
 module.exports={crearVigilancias};

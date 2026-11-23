@@ -223,51 +223,79 @@ async function buscarYLeer(marco,seccion,fechaDesde,informar) {
 }
 
 // Abre el detalle de una OT (doble clic), lo lee y regresa a la consulta.
+// El detalle puede abrirse dentro del mismo iframe o en una ventana nueva; se contemplan ambos casos.
 async function leerObservaciones(page,marco,ot) {
+  const contexto=page.context();
+  const ventanasAntes=new Set(contexto.pages());
   const celda=marco.getByRole('gridcell',{name:ot,exact:true}).or(marco.locator('td').filter({hasText:new RegExp('^\\s*'+ot+'\\s*$')})).first();
   await celda.dblclick();
-  const detalle=await esperar(async()=>{
-    const f=page.frames().find(x=>DETALLE.test(x.url()) && x.url().includes('orden_id='+ot));
-    if(f && /Observaciones Portal/i.test(await f.evaluate(()=>document.body.innerText)))return f;
-  },'No se abrió el detalle de la OT '+ot+'.',20000);
-  const texto=await detalle.evaluate(()=>document.body.innerText);
-  await detalle.evaluate(()=>history.back());
+  const encontrado=await esperar(async()=>{
+    for(const p of contexto.pages()){
+      const f=p.frames().find(x=>DETALLE.test(x.url()) && x.url().includes('orden_id='+ot));
+      if(f && /Observaciones Portal/i.test(await f.evaluate(()=>document.body.innerText).catch(()=>'')))return {f,p};
+    }
+  },'No se abrió el detalle de la OT '+ot+'.',25000);
+  const texto=await encontrado.f.evaluate(()=>document.body.innerText);
+  if(!ventanasAntes.has(encontrado.p))await encontrado.p.close();
+  else await encontrado.f.evaluate(()=>history.back());
   return leerDetalle(texto);
 }
 
 // Lee las secciones pedidas. pedidos: {gmm:{fechaDesde,observaciones:boolean}, vida:{fechaDesde}}
-async function leerSecciones(env,pedidos,informar=()=>{}) {
+const primeraLinea=error=>String(error?.message || error || '').split('\n')[0].replace(/https?:\/\/\S+/g,'[url]').slice(0,180);
+
+// Lee las secciones pedidas. pedidos: {gmm:{fechaDesde,observaciones:boolean}, vida:{fechaDesde}}
+// opciones.captura: ruta donde guardar una captura de pantalla si algo falla.
+async function leerSecciones(env,pedidos,informarFuera=()=>{},opciones={}) {
   const browser=await chromium.launch({headless:true,...(env.CHROMIUM_EXECUTABLE_PATH?{executablePath:env.CHROMIUM_EXECUTABLE_PATH}:{})});
   const resultado={};
+  let paso='inicio';
+  const informar=texto=>{paso=texto;informarFuera(texto);};
+  let page;
+  const capturar=async()=>{
+    if(!opciones.captura || !page)return;
+    await page.screenshot({path:opciones.captura,fullPage:true,timeout:10000}).catch(()=>{});
+  };
   try {
     const contexto=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:false,locale:'es-MX',timezoneId:'America/Monterrey'});
-    const page=await contexto.newPage();
+    page=await contexto.newPage();
     page.setDefaultTimeout(20000);
     try {await iniciarSesion(page,env);}
-    catch {throw new ConsultaIncompleta('No se pudo iniciar sesión en GNP (credenciales, reCAPTCHA o cambio en la pantalla de acceso).');}
+    catch {await capturar();throw new ConsultaIncompleta('No se pudo iniciar sesión en GNP (credenciales, reCAPTCHA o cambio en la pantalla de acceso).');}
     informar('Sesión iniciada');
     for(const [seccion,pedido] of Object.entries(pedidos)){
       try {
         let marco=await abrirConsulta(page,seccion,informar);
         const tramites=await buscarYLeer(marco,seccion,pedido.fechaDesde,informar);
+        const avisosLectura=[];
         if(seccion==='gmm' && pedido.observaciones){
           const abiertos=tramites.filter(t=>esAbierto('gmm',t.estatus) && (!pedido.fechaDesde || !t.fechaRegistro || t.fechaRegistro>=pedido.fechaDesde)).slice(0,MAX_DETALLES);
+          let fallas=0;
           for(const t of abiertos){
+            if(fallas>=2){avisosLectura.push('Se omitieron observaciones restantes tras 2 fallas.');break;}
             try {
+              informar('Observaciones de '+t.ot);
               Object.assign(t,await leerObservaciones(page,marco,t.ot));
               marco=await esperar(async()=>marcoDe(page,'gmm'),'No se pudo volver a la consulta.');
+              await esperar(async()=>await marco.locator('table, [role="table"]').count(),'La consulta no volvió a cargar.');
               await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
-            } catch {
-              // Si falla un detalle, se reabre la consulta y se sigue con los demás.
-              marco=await abrirConsulta(page,'gmm',()=>{});
-              await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
+            } catch(error) {
+              fallas++;
+              if(fallas===1)await capturar();
+              avisosLectura.push('No se leyeron las observaciones de '+t.ot+': '+primeraLinea(error));
+              try {
+                marco=await abrirConsulta(page,'gmm',()=>{});
+                await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
+              } catch {break;}
             }
           }
           informar('Observaciones leídas');
         }
-        resultado[seccion]={ok:true,tramites};
+        resultado[seccion]={ok:true,tramites,advertencias:avisosLectura};
       } catch(error) {
-        resultado[seccion]={ok:false,error:error instanceof ConsultaIncompleta?error.message:'No se pudo leer '+seccion.toUpperCase()+' en GNP.'};
+        await capturar();
+        const base=error instanceof ConsultaIncompleta?error.message:'No se pudo leer '+seccion.toUpperCase()+' en GNP.';
+        resultado[seccion]={ok:false,error:base+' Último paso: '+paso+'.'+(error instanceof ConsultaIncompleta?'':' Detalle: '+primeraLinea(error))};
       }
     }
     return resultado;

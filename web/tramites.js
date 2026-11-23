@@ -200,6 +200,8 @@
       el('p',{className:'hint',textContent:s.nombre+' · '+r.estatus.join(', ')+(r.fechaDesde?' · desde '+r.fechaDesde:'')+(r.claveAgente?' · clave '+r.claveAgente:'')}),
       el('p',{textContent:frecuencia(r.cadaMinutos)+' · '+r.horario.dias.map(d=>dias[d]).join(' ')+' · '+r.horario.desde+'–'+r.horario.hasta+' · '+destinos}),
       el('p',{className:'hint',textContent:'Última: '+fecha(r.ultimaEjecucion)+' · Próxima: '+(r.activa?fecha(r.proximaEjecucion):'—')+' · '+resultado(r)}),
+      ...(r.ultimoResultado?.advertencias?.length?[el('p',{className:'hint',textContent:'Advertencias: '+r.ultimoResultado.advertencias.join(' · ')})]:[]),
+      ...(r.ultimoResultado && !r.ultimoResultado.ok?[el('p',{className:'hint'},el('a',{href:'/api/tramites/vigilancias/captura-error?'+Date.now(),target:'_blank',rel:'noopener',textContent:'Ver captura de GNP al momento del error'}))]:[]),
       acciones);
   }
 
