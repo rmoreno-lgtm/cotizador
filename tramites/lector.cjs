@@ -176,9 +176,9 @@ async function siguientePagina(marco) {
 }
 
 // Ejecuta la búsqueda y lee todas las páginas.
-async function buscarYLeer(marco,seccion,fechaDesde,informar) {
+async function buscarYLeer(marco,seccion,fechaDesde,informar,estatus='Todas') {
   if(seccion==='gmm'){
-    await elegir(marco,'Estatus','Todas');
+    await elegir(marco,'Estatus',estatus);
     if(fechaDesde){
       const [a,m,d]=fechaDesde.split('-');
       const campo=marco.getByLabel(/^Fecha Inicial$/); // la «Consulta avanzada» tiene otro «Fecha inicial *»
@@ -231,15 +231,22 @@ async function leerObservaciones(page,marco,ot) {
   const ventanasAntes=new Set(contexto.pages());
   const celda=marco.getByRole('gridcell',{name:ot,exact:true}).or(marco.locator('td').filter({hasText:new RegExp('^\\s*'+ot+'\\s*$')})).first();
   await celda.dblclick();
+  // Se espera a que el detalle termine de cargar: debe mostrar la OT y el expediente, y el texto
+  // debe quedarse igual al menos 1.5 s (las observaciones llegan después del resto de la pantalla).
+  let previo='';
   const encontrado=await esperar(async()=>{
     for(const p of contexto.pages()){
       const f=p.frames().find(x=>DETALLE.test(x.url()) && x.url().includes('orden_id='+ot));
-      if(f && /Observaciones Portal/i.test(await f.evaluate(()=>document.body.innerText).catch(()=>'')))return {f,p};
+      if(!f)continue;
+      const texto=await f.evaluate(()=>document.body.innerText).catch(()=>'');
+      const listo=texto.includes(ot) && /Observaciones Portal/i.test(texto) && /Expediente Digital/i.test(texto);
+      if(listo && texto===previo)return {f,p,texto};
+      previo=listo?texto:'';
+      await pausa(1500);
     }
-  },'No se abrió el detalle de la OT '+ot+'.',25000);
-  const texto=await encontrado.f.evaluate(()=>document.body.innerText);
+  },'No se abrió el detalle de la OT '+ot+'.',40000);
+  const texto=encontrado.texto;
   if(!ventanasAntes.has(encontrado.p))await encontrado.p.close();
-  else await encontrado.f.evaluate(()=>history.back());
   return leerDetalle(texto);
 }
 
@@ -268,18 +275,31 @@ async function leerSecciones(env,pedidos,informarFuera=()=>{},opciones={}) {
     for(const [seccion,pedido] of Object.entries(pedidos)){
       try {
         let marco=await abrirConsulta(page,seccion,informar);
-        const tramites=await buscarYLeer(marco,seccion,pedido.fechaDesde,informar);
+        let tramites=await buscarYLeer(marco,seccion,pedido.fechaDesde,informar);
         const avisosLectura=[];
+        // En GMM, la búsqueda «Todas» de GNP no incluye los trámites «En Registro»: se buscan aparte.
+        const enTabla=new Set(tramites.map(t=>t.ot));
+        if(seccion==='gmm'){
+          try {
+            const registro=await buscarYLeer(marco,'gmm',pedido.fechaDesde,informar,'En Registro');
+            tramites=tramites.concat(registro.filter(t=>!enTabla.has(t.ot)));
+            await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
+          } catch(error) {
+            avisosLectura.push('No se pudieron leer los trámites En Registro: '+primeraLinea(error));
+            marco=await abrirConsulta(page,'gmm',()=>{});
+            await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
+          }
+        }
         if(seccion==='gmm' && pedido.observaciones){
-          const abiertos=tramites.filter(t=>esAbierto('gmm',t.estatus) && (!pedido.fechaDesde || !t.fechaRegistro || t.fechaRegistro>=pedido.fechaDesde)).slice(0,MAX_DETALLES);
+          const abiertos=tramites.filter(t=>enTabla.has(t.ot)).filter(t=>esAbierto('gmm',t.estatus) && (!pedido.fechaDesde || !t.fechaRegistro || t.fechaRegistro>=pedido.fechaDesde)).slice(0,MAX_DETALLES);
           let fallas=0;
           for(const t of abiertos){
             if(fallas>=2){avisosLectura.push('Se omitieron observaciones restantes tras 2 fallas.');break;}
             try {
               informar('Observaciones de '+t.ot);
               Object.assign(t,await leerObservaciones(page,marco,t.ot));
-              marco=await esperar(async()=>marcoDe(page,'gmm'),'No se pudo volver a la consulta.');
-              await esperar(async()=>await marco.locator('table, [role="table"]').count(),'La consulta no volvió a cargar.');
+              // Para volver a la tabla se reabre la consulta desde el menú (más confiable que «atrás»).
+              marco=await abrirConsulta(page,'gmm',()=>{});
               await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
             } catch(error) {
               fallas++;
