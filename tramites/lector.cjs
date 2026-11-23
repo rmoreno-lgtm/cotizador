@@ -94,43 +94,34 @@ function marcoDe(page,seccion) {
 }
 
 // Abre Servicios asistidos → ramo → INDIVIDUALES → Consulta y devuelve el iframe de la consulta.
+// El portal usa pestañas de Angular Material solo con íconos (orden: Vida, GMM, Autos, Daños) y
+// tarjetas con identificadores fijos: sera_gmm_ind_gm → sera_gmm_ind_consulta, sera_vid_ind_vida → sera_vid_ind_vidaconsulta.
+const RUTAS={
+  gmm:{pestana:1,tarjeta:'sera_gmm_ind_gm',consulta:'sera_gmm_ind_consulta',nombre:'Gastos Médicos'},
+  vida:{pestana:0,tarjeta:'sera_vid_ind_vida',consulta:'sera_vid_ind_vidaconsulta',nombre:'Vida'}
+};
 async function abrirConsulta(page,seccion,informar) {
+  const ruta=RUTAS[seccion];
   await page.goto(PORTAL+'/home/servicios',{waitUntil:'domcontentloaded'});
+  const pestanas=page.locator('.mat-mdc-tab-labels [role="tab"], .mat-mdc-tab-labels .mat-mdc-tab');
+  await esperar(async()=>await pestanas.count()>=4,'No se encontraron las pestañas de Servicios asistidos.');
   informar('Servicios asistidos');
-  const titulo=seccion==='gmm'?'GMM':'Vida';
-  const producto=seccion==='gmm'?/^gastos m[eé]dicos$/i:/^vida$/i;
-  if(seccion==='gmm'){
-    // Las pestañas son íconos; primero se intenta por nombre accesible y luego por posición (2.ª pestaña).
-    const porNombre=page.getByRole('tab',{name:/^gmm$/i}).or(page.getByRole('button',{name:/^gmm$/i}));
-    if(await porNombre.count()===1)await porNombre.click();
-    else {
-      const ok=await page.evaluate(()=>{
-        const intro=[...document.querySelectorAll('p,div,span')].find(e=>/Realiza y da seguimiento a los tr[aá]mites/.test(e.textContent) && e.children.length===0);
-        let nodo=intro;
-        for(let n=0;nodo && n<6;n++){
-          let hermano=nodo.nextElementSibling;
-          while(hermano){
-            const hijos=[...hermano.querySelectorAll(':scope > *')].filter(h=>h.getBoundingClientRect().width>0);
-            if(hijos.length===4){hijos[1].click();return true;}
-            hermano=hermano.nextElementSibling;
-          }
-          nodo=nodo.parentElement;
-        }
-        return false;
-      });
-      if(!ok)throw new ConsultaIncompleta('No se encontró la pestaña GMM en Servicios asistidos.');
-    }
-    await esperar(async()=>await page.getByText(/^GMM$/).first().isVisible(),'No se abrió la pestaña GMM.');
-    informar('GMM');
-  }
-  // Tarjeta INDIVIDUALES (la más interna que contenga el producto).
-  const tarjeta=page.locator('div,section,mat-card').filter({has:page.getByText(/^INDIVIDUALES$/i)}).filter({has:page.getByText(producto)}).last();
-  await esperar(async()=>await tarjeta.isVisible(),'No apareció la tarjeta INDIVIDUALES de '+titulo+'.');
-  await tarjeta.getByText(producto).first().click();
-  informar(seccion==='gmm'?'Gastos Médicos':'Vida');
-  const consulta=page.getByText(/^Consulta$/).filter({visible:true});
-  await esperar(async()=>await consulta.count()>=1,'No apareció la opción Consulta.');
-  await consulta.first().click();
+  const pestana=pestanas.nth(ruta.pestana);
+  if(!/mdc-tab--active/.test(await pestana.getAttribute('class') || ''))await pestana.click();
+  await esperar(async()=>/mdc-tab--active/.test(await pestana.getAttribute('class') || ''),'No se abrió la pestaña '+seccion.toUpperCase()+'.');
+  informar(seccion==='gmm'?'GMM':'Vida');
+  const tarjeta=page.locator('mat-card#'+ruta.tarjeta);
+  await esperar(async()=>await tarjeta.isVisible(),'No apareció la tarjeta '+ruta.nombre+' de INDIVIDUALES.');
+  await tarjeta.click();
+  informar(ruta.nombre);
+  // El menú se abre en una capa flotante; se busca por id y, si cambia, por el texto «Consulta» dentro del menú.
+  const porId=page.locator('mat-list-item#'+ruta.consulta+', [id="'+ruta.consulta+'"]').filter({visible:true}).first();
+  const enMenu=page.locator('.cdk-overlay-container .mat-mdc-menu-panel').getByText(/^\s*Consulta\s*$/).filter({visible:true}).first();
+  const consulta=await esperar(async()=>{
+    if(await porId.count())return porId;
+    if(await enMenu.count())return enMenu;
+  },'No apareció la opción Consulta de '+ruta.nombre+'.');
+  await consulta.click();
   informar('Consulta');
   const marco=await esperar(async()=>{
     const f=marcoDe(page,seccion);
@@ -190,7 +181,7 @@ async function buscarYLeer(marco,seccion,fechaDesde,informar) {
     await elegir(marco,'Estatus','Todas');
     if(fechaDesde){
       const [a,m,d]=fechaDesde.split('-');
-      const campo=marco.getByLabel(/fecha inicial/i);
+      const campo=marco.getByLabel(/^Fecha Inicial$/); // la «Consulta avanzada» tiene otro «Fecha inicial *»
       if(await campo.count()===1){
         await campo.fill(Number(d)+'/'+Number(m)+'/'+a);
         await campo.press('Tab');
