@@ -182,9 +182,11 @@ async function buscarYLeer(marco,seccion,fechaDesde,informar) {
     if(fechaDesde){
       const [a,m,d]=fechaDesde.split('-');
       const campo=marco.getByLabel(/^Fecha Inicial$/); // la «Consulta avanzada» tiene otro «Fecha inicial *»
-      if(await campo.count()===1){
-        await campo.fill(Number(d)+'/'+Number(m)+'/'+a);
-        await campo.press('Tab');
+      // En GNP este campo suele ser de solo lectura (se elige con el calendario). Si no se puede escribir,
+      // se deja el rango por defecto (1 de enero a hoy) y el filtro «desde» se aplica al leer los trámites.
+      if(await campo.count()===1 && await campo.isEditable({timeout:1000}).catch(()=>false)){
+        await campo.fill(Number(d)+'/'+Number(m)+'/'+a,{timeout:5000}).catch(()=>{});
+        await campo.press('Tab',{timeout:2000}).catch(()=>{});
       }
     }
   } else {
