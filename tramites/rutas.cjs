@@ -25,6 +25,10 @@ function registrarVigilancias(app,{env,base,leer,enviar,programar}) {
   app.delete('/api/tramites/vigilancias/:id',manejar(async(req,res)=>{
     (await vigilancias.eliminar(req.params.id))?res.sendStatus(204):res.status(404).json({error:'La regla no existe.'});
   }));
+  app.get('/api/tramites/vigilancias/captura-error',(req,res)=>{
+    res.set('Cache-Control','no-store');
+    res.sendFile(vigilancias.captura,error=>{if(error && !res.headersSent)res.status(404).json({error:'No hay captura de error.'});});
+  });
   app.get('/api/tramites/vigilancias/:id/tramites',manejar(async(req,res)=>res.json(await vigilancias.tramites(req.params.id))));
   app.post('/api/tramites/vigilancias/:id/ejecutar',manejar(async(req,res)=>{
     if(!env.GNP_USERNAME || !env.GNP_PASSWORD)return res.status(503).json({error:'La consulta requiere las credenciales de GNP en Railway.'});
