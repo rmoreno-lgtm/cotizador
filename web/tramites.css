@@ -1,0 +1,24 @@
+.vig{margin-top:18px}
+.vig-encabezado{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.vig-encabezado h2{margin:0 0 4px}
+.vig-regla{border:1px solid rgba(31,42,68,.14);border-radius:10px;padding:14px 16px;margin:0 0 12px}
+.vig-regla h3{margin:0 0 6px}
+.vig-regla p{margin:0 0 6px}
+.vig-pausada{opacity:.65}
+.vig-acciones{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+#vig-form{border-top:1px solid rgba(31,42,68,.14);margin-top:16px;padding-top:12px}
+#vig-form fieldset{border:1px solid rgba(31,42,68,.14);border-radius:10px;margin:0 0 12px;padding:10px 14px}
+#vig-form fieldset label{display:inline-flex;align-items:center;gap:6px;margin:0 14px 6px 0;font-weight:400}
+.vig-avisar label{display:flex!important}
+#vig-estatus{display:flex;flex-wrap:wrap}
+.vig-activa{display:flex;align-items:center;gap:8px}
+.vig-avisos{list-style:none;padding:0;margin:0}
+.vig-avisos>li{border-bottom:1px solid rgba(31,42,68,.1);padding:8px 0}
+.vig-avisos ul{margin:6px 0 0 18px;padding:0}
+.vig input[type=checkbox]{display:inline-block;width:18px;height:18px;margin:0;padding:0;flex:0 0 auto;accent-color:#104b74}
+#vig-form fieldset label,.vig-activa{display:inline-flex!important;align-items:center;gap:8px;margin:0 16px 8px 0;font-weight:400;font-size:14px;width:auto}
+.vig-avisar label{display:flex!important;width:100%}
+#vig-form legend{font-size:13px;font-weight:bold;padding:0 6px}
+#vig-form textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;border:1px solid #b9c9d8;padding:12px;border-radius:7px;font:15px Arial;color:var(--navy);background:white;margin-top:7px}
+#vig-form small{display:block;font-weight:400;color:#6b7785;margin-top:4px}
+#vig-abiertos{margin-top:6px}
