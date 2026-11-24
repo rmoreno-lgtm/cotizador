@@ -92,20 +92,21 @@
         <label><input type="checkbox" name="avisar" value="observaciones" checked>GNP agregue una observación</label>
         <label><input type="checkbox" name="avisar" value="compromiso" checked>Cambie la fecha compromiso</label>
         <label><input type="checkbox" name="avisar" value="salidas" checked>Un trámite salga de la vista (se cerró o cambió a otro estatus)</label>
-        <label id="vig-obs-label"><input type="checkbox" name="leerObservaciones" checked>Leer las Observaciones Portal de cada trámite abierto (solo GMM)</label>
+        <label id="vig-obs-label"><input type="checkbox" name="leerObservaciones" checked>Leer las Observaciones Portal (comentarios de GNP) de cada trámite abierto</label>
       </fieldset>
       <div class="fields">
         <label>Correos del equipo<textarea name="correos" rows="2" placeholder="r.moreno@quillum.com.mx, equipo@quillum.com.mx"></textarea><small>Separados por coma. Máximo 10.</small></label>
         <label>WhatsApp<textarea name="whatsapp" rows="2" placeholder="5218180202414"></textarea><small>Con lada de país (52 + 1 + 10 dígitos). Máximo 5.</small></label>
         <label>Solo clave de agente<input name="claveAgente" inputmode="numeric" maxlength="10" placeholder="Todas"><small>Opcional, 10 dígitos.</small></label>
       </div>
+      <label class="vig-ots">Seguimiento puntual: solo estas OT<textarea name="ots" rows="2" placeholder="26O27G5338, 26N13V4332"></textarea><small>Opcional. Si escribes OT, la regla solo vigila esos trámites (máximo 20). Útil para cierres: ponle una frecuencia corta.</small></label>
       <label class="vig-activa"><input type="checkbox" name="activa" checked>Regla activa</label>
       <div class="vig-acciones"><button type="submit">Guardar regla</button><button type="button" class="secondary" id="vig-cancelar">Cancelar</button></div>
     </form>
 
     <details id="vig-tramites" hidden><summary id="vig-tramites-titulo">Trámites en la vista</summary>
       <div class="tramites-vista-tabla" tabindex="0" role="region" aria-label="Trámites en la vista de la regla">
-        <table><thead><tr><th scope="col">OT</th><th scope="col">Contratante</th><th scope="col">Tipo</th><th scope="col">Póliza</th><th scope="col">Estatus</th><th scope="col">Registro</th><th scope="col">Compromiso</th><th scope="col">Última observación de GNP</th></tr></thead>
+        <table><thead><tr><th scope="col">OT</th><th scope="col">Contratante</th><th scope="col">Tipo</th><th scope="col">Póliza</th><th scope="col">Estatus</th><th scope="col">Registro</th><th scope="col">Compromiso</th><th scope="col">Última observación de GNP</th><th scope="col"><span class="visually-hidden">Acciones</span></th></tr></thead>
         <tbody id="vig-tramites-filas"></tbody></table>
       </div>
     </details>

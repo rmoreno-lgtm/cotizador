@@ -74,6 +74,9 @@ function validarRegla(entrada={}) {
   for(const n of whatsapp)if(!/^\d{10,15}$/.test(n))throw new ReglaInvalida('WhatsApp no válido: '+n+' (usa lada de país, p. ej. 5218112345678).');
   const claveAgente=texto(entrada.claveAgente,'la clave de agente',10);
   if(claveAgente && !/^\d{10}$/.test(claveAgente))throw new ReglaInvalida('La clave de agente tiene 10 dígitos.');
+  const ots=[...new Set(lista(entrada.ots).map(o=>o.toUpperCase()))];
+  if(ots.length>20)throw new ReglaInvalida('Máximo 20 OT por regla.');
+  for(const o of ots)if(!/^[0-9A-Z]{8,14}$/.test(o))throw new ReglaInvalida('OT no válida: '+o);
   const a=entrada.avisar || {};
   const avisar={
     nuevos:a.nuevos!==false,
@@ -85,8 +88,8 @@ function validarRegla(entrada={}) {
   return {
     nombre,seccion,estatus,fechaDesde,cadaMinutos,
     horario:{dias,desde,hasta},
-    correos,whatsapp,claveAgente,avisar,
-    leerObservaciones:seccion==='gmm' && entrada.leerObservaciones!==false,
+    correos,whatsapp,claveAgente,ots,avisar,
+    leerObservaciones:entrada.leerObservaciones!==false,
     activa:entrada.activa!==false
   };
 }
@@ -106,12 +109,13 @@ function enHorario(regla,fecha,zona) {
 // Aplica los filtros de la regla a los trámites leídos de su sección.
 function filtrar(regla,tramites) {
   const estatus=new Set(regla.estatus.map(normalizar));
-  return tramites.filter(t=>estatus.has(normalizar(t.estatus)) &&
+  const ots=new Set(regla.ots || []);
+  return tramites.filter(t=>(!ots.size || ots.has(String(t.ot).toUpperCase())) && estatus.has(normalizar(t.estatus)) &&
     (!regla.fechaDesde || !t.fechaRegistro || t.fechaRegistro>=regla.fechaDesde) &&
     (!regla.claveAgente || !t.agente || t.agente===regla.claveAgente));
 }
 
-const ultimaObservacionGnp=t=>(t.observaciones || []).filter(o=>/empleado gnp/i.test(o.autor)).sort((a,b)=>a.fecha<b.fecha?1:-1)[0] || null;
+const ultimaObservacionGnp=t=>(t.observaciones || []).filter(o=>/empleado gnp|^observaciones portal$/i.test(o.autor)).sort((a,b)=>a.fecha<b.fecha?1:-1)[0] || null;
 
 // Resume solo lo que se compara, para guardar el estado entre corridas.
 function instantanea(t) {
@@ -124,6 +128,15 @@ function instantanea(t) {
     observacionesLeidas:Array.isArray(t.observaciones)
   };
 }
+
+// Cuenta los trámites de la vista por estatus, en el orden de la sección.
+function conteo(seccion,vista) {
+  const cuenta={};
+  for(const t of Object.values(vista))cuenta[t.estatus]=(cuenta[t.estatus] || 0)+1;
+  const orden=SECCIONES[seccion].estatus.map(normalizar);
+  return Object.entries(cuenta).sort((a,b)=>orden.indexOf(normalizar(a[0]))-orden.indexOf(normalizar(b[0]))).map(([estatus,total])=>({estatus,total}));
+}
+const textoConteo=c=>c.length?c.map(x=>x.estatus+': '+x.total).join(' · '):'sin trámites';
 
 // Devuelve los cambios entre la corrida anterior y la actual, ya filtradas por la regla.
 function comparar(regla,anterior,actual) {
@@ -179,7 +192,7 @@ function armarAviso(regla,{cambios,vista,inicial,fecha,zona}) {
     : cambios.map(describirCambio);
   if(inicial && lista.length>30)lineas.push('… y '+(lista.length-30)+' más.');
   if(inicial && !lista.length)lineas.push('Por ahora no hay trámites que cumplan la regla. Te avisaremos cuando aparezcan.');
-  const encabezado=seccion+' · '+cuando+' · '+lista.length+' trámites en la vista';
+  const encabezado=seccion+' · '+cuando+' · '+lista.length+' trámites en la vista ('+textoConteo(conteo(regla.seccion,vista))+')';
   const textoPlano=[asunto,encabezado,'',...lineas.map(l=>'• '+l)].join('\n');
   const esc=s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
   const html='<div style="font-family:Arial,sans-serif;color:#1f2a44"><h2 style="margin:0 0 4px">'+esc(asunto)+'</h2>'+
@@ -190,4 +203,4 @@ function armarAviso(regla,{cambios,vista,inicial,fecha,zona}) {
   return {asunto,texto:textoPlano,html,whatsapp};
 }
 
-module.exports={SECCIONES,ABIERTOS,MINIMO_MINUTOS,ReglaInvalida,validarRegla,enHorario,partesLocales,filtrar,instantanea,comparar,armarAviso,describirCambio,esAbierto,normalizar,ultimaObservacionGnp};
+module.exports={conteo,textoConteo,SECCIONES,ABIERTOS,MINIMO_MINUTOS,ReglaInvalida,validarRegla,enHorario,partesLocales,filtrar,instantanea,comparar,armarAviso,describirCambio,esAbierto,normalizar,ultimaObservacionGnp};

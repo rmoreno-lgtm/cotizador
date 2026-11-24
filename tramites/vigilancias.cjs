@@ -95,7 +95,8 @@ function crearVigilancias({env,base,leer,enviar=avisos.enviarAviso,reloj=()=>new
     try {
       const pedidos={};
       for(const r of lista){
-        const p=pedidos[r.seccion] ||= {fechas:[],observaciones:false};
+        const p=pedidos[r.seccion] ||= {fechas:[],observaciones:false,ots:[]};
+        p.ots.push(...(r.ots || []));
         p.fechas.push(r.fechaDesde || '');
         p.observaciones ||= r.leerObservaciones;
       }
@@ -123,7 +124,7 @@ function crearVigilancias({env,base,leer,enviar=avisos.enviarAviso,reloj=()=>new
         const inicial=!anterior;
         const cambios=inicial?[]:reglas.comparar(regla,anterior.tramites,vista);
         datos.estados[regla.id]={actualizado:ahora.toISOString(),tramites:vista};
-        regla.ultimoResultado={ok:true,cambios:cambios.length,enVista:Object.keys(vista).length,inicial,advertencias:(seccion.advertencias || []).slice(0,5)};
+        regla.ultimoResultado={ok:true,cambios:cambios.length,enVista:Object.keys(vista).length,conteo:reglas.conteo(regla.seccion,vista),inicial,advertencias:(seccion.advertencias || []).slice(0,5)};
         if(inicial || cambios.length){
           const aviso=reglas.armarAviso(regla,{cambios,vista,inicial,fecha:ahora,zona});
           const envio=(regla.correos.length || regla.whatsapp.length)?await enviar(env,regla,aviso):{correo:null,whatsapp:[]};

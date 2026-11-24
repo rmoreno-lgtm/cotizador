@@ -89,6 +89,21 @@ function leerDetalle(texto) {
   return {tipoMovimiento,observaciones,documentos};
 }
 
+// Detalle de Vida (wf-dasvida /detalle-*): los valores van en campos; las observaciones, entre
+// «Observaciones Portal» y «¿Requiere Autorización Especial?».
+function leerDetalleVida(texto) {
+  const lineas=String(texto).split('\n').map(l=>l.replace(/\t+/g,' ').trim());
+  const i=lineas.findIndex(l=>/^tipo de movimiento$/i.test(l));
+  const siguiente=i>=0?lineas.slice(i+1).find(Boolean) || '':'';
+  const tipoMovimiento=/^(producto|fecha|estatus|moneda)/i.test(siguiente)?'':siguiente;
+  const inicio=texto.search(/Observaciones Portal/i);
+  const fin=texto.search(/¿?\s*Requiere Autorizaci[oó]n Especial/i);
+  const bloque=inicio>=0?texto.slice(inicio+'Observaciones Portal'.length,fin>inicio?fin:undefined).trim():'';
+  const estructurado=leerDetalle('Observaciones Portal\n'+bloque+'\nExpediente Digital').observaciones;
+  const observaciones=estructurado.length?estructurado:(bloque?[{autor:'Observaciones Portal',fecha:'',texto:bloque}]:[]);
+  return {tipoMovimiento,observaciones,documentos:[]};
+}
+
 function marcoDe(page,seccion) {
   return page.frames().find(f=>MARCOS[seccion].test(f.url()));
 }
@@ -190,7 +205,7 @@ async function buscarYLeer(marco,seccion,fechaDesde,informar,estatus='Todas') {
       }
     }
   } else {
-    await elegir(marco,'Estatus','TODAS');
+    await elegir(marco,'Estatus',estatus==='Todas'?'TODAS':estatus);
   }
   await marco.getByRole('button',{name:/^\s*buscar\s*$/i}).first().click();
   informar('Búsqueda');
@@ -224,33 +239,37 @@ async function buscarYLeer(marco,seccion,fechaDesde,informar,estatus='Todas') {
   return [...vistos.values()];
 }
 
-// Abre el detalle de una OT (doble clic), lo lee y regresa a la consulta.
-// El detalle puede abrirse dentro del mismo iframe o en una ventana nueva; se contemplan ambos casos.
-async function leerObservaciones(page,marco,ot) {
+// Abre el detalle de una OT (doble clic) y lo lee. El detalle puede abrirse dentro del iframe o en
+// una ventana nueva. GMM: wf-da.gnp.com.mx (?orden_id=OT). Vida: wf-dasvida.gnp.com.mx/detalle-* (OT en un campo).
+const DETALLE_VIDA=/^https:\/\/wf-dasvida\.gnp\.com\.mx\/detalle/;
+async function leerObservaciones(page,marco,ot,seccion='gmm') {
   const contexto=page.context();
   const ventanasAntes=new Set(contexto.pages());
   const celda=marco.getByRole('gridcell',{name:ot,exact:true}).or(marco.locator('td').filter({hasText:new RegExp('^\\s*'+ot+'\\s*$')})).first();
+  await esperar(async()=>await celda.isVisible(),'La OT '+ot+' no aparece en la tabla.');
   await celda.dblclick();
-  // Se espera a que el detalle termine de cargar: debe mostrar la OT y el expediente, y el texto
-  // debe quedarse igual al menos 1.5 s (las observaciones llegan después del resto de la pantalla).
+  // Se espera a que el detalle termine de cargar y su texto quede estable (las observaciones llegan al final).
   let previo='';
   const inicio=Date.now();
   const encontrado=await esperar(async()=>{
     for(const p of contexto.pages()){
-      const f=p.frames().find(x=>DETALLE.test(x.url()) && x.url().includes('orden_id='+ot));
-      if(!f)continue;
-      const texto=await f.evaluate(()=>document.body.innerText).catch(()=>'');
-      // Listo cuando ya hay observaciones cargadas; si el trámite no tiene ninguna, se acepta tras 20 s estable.
-      const listo=texto.includes(ot) && /Observaciones Portal/i.test(texto) && /Expediente Digital/i.test(texto) &&
-        (/INTRODUCIDO POR/.test(texto) || Date.now()-inicio>20000);
-      if(listo && texto===previo)return {f,p,texto};
-      previo=listo?texto:'';
-      await pausa(1500);
+      for(const f of p.frames()){
+        let ok=false;
+        if(seccion==='gmm')ok=DETALLE.test(f.url()) && f.url().includes('orden_id='+ot);
+        else ok=DETALLE_VIDA.test(f.url()) && await f.evaluate(o=>[...document.querySelectorAll('input')].some(i=>i.value===o),ot).catch(()=>false);
+        if(!ok)continue;
+        const texto=await f.evaluate(()=>document.body.innerText).catch(()=>'');
+        const base=/Observaciones Portal/i.test(texto) && (seccion==='gmm'?texto.includes(ot) && /Expediente Digital/i.test(texto):/Requiere Autorizaci/i.test(texto));
+        const listo=base && (/INTRODUCIDO POR/.test(texto) || Date.now()-inicio>(seccion==='gmm'?20000:8000));
+        if(listo && texto===previo)return {f,p,texto};
+        previo=listo?texto:'';
+        await pausa(1500);
+        return null;
+      }
     }
   },'No se abrió el detalle de la OT '+ot+'.',60000);
-  const texto=encontrado.texto;
   if(!ventanasAntes.has(encontrado.p))await encontrado.p.close();
-  return leerDetalle(texto);
+  return seccion==='gmm'?leerDetalle(encontrado.texto):leerDetalleVida(encontrado.texto);
 }
 
 // Lee las secciones pedidas. pedidos: {gmm:{fechaDesde,observaciones:boolean}, vida:{fechaDesde}}
@@ -293,25 +312,27 @@ async function leerSecciones(env,pedidos,informarFuera=()=>{},opciones={}) {
             await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
           }
         }
-        if(seccion==='gmm' && pedido.observaciones){
-          const abiertos=tramites.filter(t=>enTabla.has(t.ot)).filter(t=>esAbierto('gmm',t.estatus) && (!pedido.fechaDesde || !t.fechaRegistro || t.fechaRegistro>=pedido.fechaDesde)).slice(0,MAX_DETALLES);
+        if(pedido.observaciones){
+          // Solo trámites ya enviados a GNP (no «En Registro»), con prioridad a las OT en seguimiento puntual.
+          const prioridad=new Set(pedido.ots || []);
+          const candidatos=tramites
+            .filter(t=>esAbierto(seccion,t.estatus) && !/registro/i.test(t.estatus))
+            .filter(t=>prioridad.has(t.ot) || !pedido.fechaDesde || !t.fechaRegistro || t.fechaRegistro>=pedido.fechaDesde)
+            .sort((x,y)=>Number(prioridad.has(y.ot))-Number(prioridad.has(x.ot)))
+            .slice(0,MAX_DETALLES);
           let fallas=0;
-          for(const t of abiertos){
+          for(const t of candidatos){
             if(fallas>=2){avisosLectura.push('Se omitieron observaciones restantes tras 2 fallas.');break;}
             try {
               informar('Observaciones de '+t.ot);
-              Object.assign(t,await leerObservaciones(page,marco,t.ot));
-              // Para volver a la tabla se reabre la consulta desde el menú (más confiable que «atrás»).
-              marco=await abrirConsulta(page,'gmm',()=>{});
-              await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
+              // Se reabre la consulta y se filtra por el estatus del trámite para que aparezca en la primera página.
+              marco=await abrirConsulta(page,seccion,()=>{});
+              await buscarYLeer(marco,seccion,pedido.fechaDesde,()=>{},t.estatus);
+              Object.assign(t,await leerObservaciones(page,marco,t.ot,seccion));
             } catch(error) {
               fallas++;
               if(fallas===1)await capturar();
               avisosLectura.push('No se leyeron las observaciones de '+t.ot+': '+primeraLinea(error));
-              try {
-                marco=await abrirConsulta(page,'gmm',()=>{});
-                await buscarYLeer(marco,'gmm',pedido.fechaDesde,()=>{});
-              } catch {break;}
             }
           }
           informar('Observaciones leídas');
@@ -327,4 +348,4 @@ async function leerSecciones(env,pedidos,informarFuera=()=>{},opciones={}) {
   } finally {await browser.close();}
 }
 
-module.exports={leerSecciones,leerDetalle,mapearFila,fechaIso};
+module.exports={leerSecciones,leerDetalle,leerDetalleVida,mapearFila,fechaIso};

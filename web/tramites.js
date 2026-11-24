@@ -124,13 +124,14 @@
     const elegidos=new Set(marcados || info.abiertos);
     $('vig-estatus').replaceChildren(...info.estatus.map(e=>el('label',{},
       el('input',{type:'checkbox',name:'estatus',value:e,checked:elegidos.has(e)}),e)));
-    $('vig-obs-label').hidden=seccion!=='gmm';
   }
 
   function abrirFormulario(regla) {
     editando=regla?.id || null;
+    if(regla && !regla.id)regla={horario:{dias:[1,2,3,4,5],desde:'08:00',hasta:'20:00'},avisar:{nuevos:true,estatus:true,observaciones:true,compromiso:true,salidas:true},
+      leerObservaciones:true,correos:[],whatsapp:[],claveAgente:'',activa:true,fechaDesde:'',...regla};
     form.reset();
-    $('vig-form-titulo').textContent=regla?'Editar regla':'Nueva regla';
+    $('vig-form-titulo').textContent=editando?'Editar regla':'Nueva regla';
     $('vig-seccion').replaceChildren(...Object.entries(estado.secciones).map(([k,v])=>el('option',{value:k,textContent:v.nombre})));
     if(regla){
       form.nombre.value=regla.nombre;
@@ -147,6 +148,7 @@
       form.correos.value=regla.correos.join(', ');
       form.whatsapp.value=regla.whatsapp.join(', ');
       form.claveAgente.value=regla.claveAgente || '';
+      form.ots.value=(regla.ots || []).join(', ');
       form.activa.checked=regla.activa;
     } else {
       form.fechaDesde.value=new Date().toLocaleDateString('en-CA');
@@ -164,7 +166,7 @@
       estatus:marcados('estatus'),cadaMinutos:Number(form.cadaMinutos.value),
       horario:{dias:marcados('dias').map(Number),desde:form.desde.value,hasta:form.hasta.value},
       avisar,leerObservaciones:form.leerObservaciones.checked,
-      correos:form.correos.value,whatsapp:form.whatsapp.value,claveAgente:form.claveAgente.value,
+      correos:form.correos.value,whatsapp:form.whatsapp.value,claveAgente:form.claveAgente.value,ots:form.ots.value,
       activa:form.activa.checked
     };
   }
@@ -200,6 +202,8 @@
       el('p',{className:'hint',textContent:s.nombre+' · '+r.estatus.join(', ')+(r.fechaDesde?' · desde '+r.fechaDesde:'')+(r.claveAgente?' · clave '+r.claveAgente:'')}),
       el('p',{textContent:frecuencia(r.cadaMinutos)+' · '+r.horario.dias.map(d=>dias[d]).join(' ')+' · '+r.horario.desde+'–'+r.horario.hasta+' · '+destinos}),
       el('p',{className:'hint',textContent:'Última: '+fecha(r.ultimaEjecucion)+' · Próxima: '+(r.activa?fecha(r.proximaEjecucion):'—')+' · '+resultado(r)}),
+      ...(r.ultimoResultado?.conteo?.length?[el('p',{className:'vig-conteo'},...r.ultimoResultado.conteo.map(c=>el('span',{textContent:c.estatus+': '+c.total})))]:[]),
+      ...(r.ots?.length?[el('p',{className:'hint',textContent:'Seguimiento puntual: '+r.ots.join(', ')})]:[]),
       ...(r.ultimoResultado?.advertencias?.length?[el('p',{className:'hint',textContent:'Advertencias: '+r.ultimoResultado.advertencias.join(' · ')})]:[]),
       ...(r.ultimoResultado && !r.ultimoResultado.ok?[el('p',{className:'hint'},el('a',{href:'/api/tramites/vigilancias/captura-error?'+Date.now(),target:'_blank',rel:'noopener',textContent:'Ver captura de GNP al momento del error'}))]:[]),
       acciones);
@@ -215,8 +219,11 @@
       for(const v of [t.ot,t.contratante,t.tipoMovimiento || t.tipo,t.poliza,t.estatus,t.fechaRegistro,t.fechaCompromiso || '—',
         t.observacionGnp?t.observacionGnp.fecha+': '+t.observacionGnp.texto:(t.observacionesLeidas?'Sin observaciones de GNP':'—')])
         fila.insertCell().textContent=v || '—';
+      fila.insertCell().append(el('button',{type:'button',className:'secondary',textContent:'Seguir de cerca',
+        onclick:()=>abrirFormulario({nombre:'Seguimiento '+t.ot+' · '+(t.contratante || '').slice(0,40),seccion:r.seccion,
+          estatus:estado.secciones[r.seccion].estatus,ots:[t.ot],cadaMinutos:60})}));
       return fila;
-    }):[el('tr',{},el('td',{colSpan:8,textContent:'No hay trámites que cumplan la regla.'}))]));
+    }):[el('tr',{},el('td',{colSpan:9,textContent:'No hay trámites que cumplan la regla.'}))]));
   }
 
   function pintar() {
