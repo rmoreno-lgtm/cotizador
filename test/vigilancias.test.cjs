@@ -24,7 +24,7 @@ test('valida reglas y rechaza datos incorrectos',()=>{
   assert.throws(()=>reglas.validarRegla({...base,correos:'no-es-correo'}),reglas.ReglaInvalida);
   assert.throws(()=>reglas.validarRegla({...base,horario:{dias:[1],desde:'20:00',hasta:'08:00'}}),reglas.ReglaInvalida);
   assert.throws(()=>reglas.validarRegla({...base,fechaDesde:'2026-02-30'}),reglas.ReglaInvalida);
-  assert.equal(reglas.validarRegla({...base,seccion:'vida',estatus:['activada']}).leerObservaciones,false);
+  assert.equal(reglas.validarRegla({...base,seccion:'vida',estatus:['activada']}).leerObservaciones,true);
 });
 
 test('respeta el horario y los días en la zona del despacho',()=>{
@@ -186,4 +186,23 @@ test('avisos: correo y WhatsApp usan sus APIs y reportan canales sin configurar'
   assert.match(llamadas[1].url,/graph\.facebook\.com\/v21\.0\/123\/messages$/);
   assert.equal(llamadas[1].body.template.name,'aviso_tramites');
   assert.equal(llamadas[1].body.to,'5218180202414');
+});
+
+test('seguimiento puntual por OT, conteo por estatus y detalle de Vida',()=>{
+  const {leerDetalleVida}=require('../tramites/lector.cjs');
+  const r=reglas.validarRegla({...base,estatus:reglas.SECCIONES.gmm.estatus,fechaDesde:'',ots:'26o27g5338, 26O12G2880'});
+  assert.deepEqual(r.ots,['26O27G5338','26O12G2880']);
+  assert.throws(()=>reglas.validarRegla({...base,ots:'mal ot!'}),reglas.ReglaInvalida);
+  const lista=[{ot:'26O27G5338',estatus:'Activada'},{ot:'26O12G2880',estatus:'Terminada'},{ot:'26N01G0001',estatus:'Activada'}];
+  assert.deepEqual(reglas.filtrar(r,lista).map(t=>t.ot),['26O27G5338','26O12G2880']);
+  const vista={a:{ot:'a',estatus:'Activada'},b:{ot:'b',estatus:'En Registro'},c:{ot:'c',estatus:'En Registro'}};
+  assert.deepEqual(reglas.conteo('gmm',vista),[{estatus:'En Registro',total:2},{estatus:'Activada',total:1}]);
+  const aviso=reglas.armarAviso(r,{cambios:[],vista,inicial:true,fecha:new Date(),zona:'America/Monterrey'});
+  assert.match(aviso.texto,/En Registro: 2 · Activada: 1/);
+  const d=leerDetalleVida('Detalle\nTipo de Movimiento \nTransferencia electrónica\nProducto\nPROFESIONAL\nObservaciones Portal\n(INTRODUCIDO POR Empleado GNP - 2026-11-20 10:15 hrs)\nFalta cuestionario médico firmado\n¿Requiere Autorización Especial? *\nSi');
+  assert.equal(d.tipoMovimiento,'Transferencia electrónica');
+  assert.equal(d.observaciones[0].texto,'Falta cuestionario médico firmado');
+  const libre=leerDetalleVida('Observaciones Portal\nPendiente examen médico\n¿Requiere Autorización Especial?');
+  assert.equal(reglas.ultimaObservacionGnp(libre).texto,'Pendiente examen médico');
+  assert.equal(leerDetalleVida('Observaciones Portal\n\n¿Requiere Autorización Especial?').observaciones.length,0);
 });

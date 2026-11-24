@@ -22,3 +22,12 @@
 #vig-form textarea{display:block;width:100%;box-sizing:border-box;resize:vertical;border:1px solid #b9c9d8;padding:12px;border-radius:7px;font:15px Arial;color:var(--navy);background:white;margin-top:7px}
 #vig-form small{display:block;font-weight:400;color:#6b7785;margin-top:4px}
 #vig-abiertos{margin-top:6px}
+.vig-conteo{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+.vig-conteo span{background:#eef3f8;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:bold;color:#104b74}
+.vig-ots{display:block;margin:0 0 12px}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+#vig-tramites .tramites-vista-tabla{overflow-x:auto}
+#vig-tramites table{width:100%;min-width:980px;border-collapse:collapse;font-size:13px}
+#vig-tramites th,#vig-tramites td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid rgba(31,42,68,.1)}
+#vig-tramites td:nth-child(8){min-width:260px}
+#vig-tramites td:last-child{white-space:nowrap}
